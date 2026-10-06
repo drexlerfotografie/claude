@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "drexler-claude",
+  "description": "Persoenlicher Claude Code Plugin-Marktplatz von Lukas Drexler.",
+  "owner": {
+    "name": "Lukas Drexler"
+  },
+  "plugins": [
+    {
+      "name": "drexler-starter",
+      "source": "./plugins/drexler-starter",
+      "description": "Minimaler Starter-Plugin zum Testen und als Vorlage fuer weitere Claude Code Plugins.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Lukas Drexler"
+      }
+    }
+  ]
+}
