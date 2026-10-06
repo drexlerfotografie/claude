@@ -1,0 +1,9 @@
+{
+  "name": "drexler-starter",
+  "version": "0.1.0",
+  "description": "Minimaler Starter-Plugin zum Testen und als Vorlage fuer weitere Claude Code Plugins.",
+  "author": {
+    "name": "Lukas Drexler"
+  },
+  "homepage": "https://github.com/drexlerfotografie/claude"
+}
