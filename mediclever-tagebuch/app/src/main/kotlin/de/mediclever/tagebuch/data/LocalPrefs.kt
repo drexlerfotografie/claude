@@ -29,6 +29,8 @@ data class LocalState(
     val lastSyncError: String = "",
     /** Hinweis "keine Patientendaten" wurde bestaetigt. */
     val hintSeen: Boolean = false,
+    /** Konto, mit dem dieses Geraet zuletzt abgeglichen hat. */
+    val lastUid: String = "",
 )
 
 class LocalPrefs(private val store: DataStore<Preferences>) {
@@ -44,6 +46,7 @@ class LocalPrefs(private val store: DataStore<Preferences>) {
         val lastSyncAt = longPreferencesKey("lastSyncAt")
         val lastSyncError = stringPreferencesKey("lastSyncError")
         val hintSeen = booleanPreferencesKey("hintSeen")
+        val lastUid = stringPreferencesKey("lastUid")
         fun cursor(t: Table) = longPreferencesKey("cursor_${t.path}")
     }
 
@@ -58,6 +61,7 @@ class LocalPrefs(private val store: DataStore<Preferences>) {
             lastSyncAt = p[K.lastSyncAt] ?: 0,
             lastSyncError = p[K.lastSyncError] ?: "",
             hintSeen = p[K.hintSeen] ?: false,
+            lastUid = p[K.lastUid] ?: "",
         )
     }
 
@@ -71,6 +75,7 @@ class LocalPrefs(private val store: DataStore<Preferences>) {
     }
     suspend fun setConsent(at: Long) { store.edit { it[K.consentAt] = at } }
     suspend fun setOnboardingDone(done: Boolean) { store.edit { it[K.onboardingDone] = done } }
+    suspend fun setLastUid(uid: String) { store.edit { it[K.lastUid] = uid } }
     suspend fun setHintSeen() { store.edit { it[K.hintSeen] = true } }
     suspend fun setPin(hash: String, salt: String) { store.edit { it[K.pinHash] = hash; it[K.pinSalt] = salt } }
     suspend fun setSyncResult(at: Long, error: String) {

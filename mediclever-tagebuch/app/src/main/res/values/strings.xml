@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MediClever Tagebuch</string>
+    <string name="widget_name">Stimmung eintragen</string>
+    <string name="widget_description">Fünf Stufen zum Antippen und deine Tage in Folge</string>
+</resources>

@@ -37,6 +37,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", hasFirebaseConfig.toString())
+        // -PfirebaseEmulator=true verbindet Debug-Builds mit dem lokalen Firebase-Emulator (siehe firebase/README.md)
+        buildConfigField("boolean", "FIREBASE_EMULATOR", (providers.gradleProperty("firebaseEmulator").orNull == "true").toString())
         // Web-Client-ID aus der Firebase-Konsole fuer die Google-Anmeldung, siehe docs/firebase-einrichtung.md
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${providers.gradleProperty("googleWebClientId").orNull ?: ""}\"")
     }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nur diese beiden Cache-Ordner sind fuer Kamera und Teilen freigegeben, nie der Foto-Speicher selbst. -->
+<paths>
+    <cache-path name="camera" path="camera/" />
+    <cache-path name="share" path="share/" />
+</paths>
