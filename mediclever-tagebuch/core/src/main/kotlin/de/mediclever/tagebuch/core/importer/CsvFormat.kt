@@ -308,7 +308,7 @@ object CsvFormat {
         for (name in import.unknownMoods) {
             val level = (levels[key(name)] ?: suggestedMoodLevel(name)).coerceIn(1, 5)
             moods.getOrPut(key(name)) {
-                Mood(id = csvId("mood", key(name)), level = level, name = name.trim(), icon = "mood$level", sortOrder = moods.size, updatedAt = now)
+                Mood(id = csvId("mood", key(name)), level = level, name = name.trim(), icon = "a", sortOrder = moods.size, updatedAt = now)
             }
         }
         for (name in import.unknownActivities) {

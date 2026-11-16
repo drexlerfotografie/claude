@@ -56,7 +56,7 @@ fun GoalsScreen() {
         val list = active.map { it.goal }.toMutableList(); val j = i + by
         if (j in list.indices) { list.add(j, list.removeAt(i)); env.act { save(list.mapIndexed { k, g -> g.copy(sortOrder = k) }) } }
     }
-    SubScreen("Ziele", nav.back, floating = { ExtendedFloatingActionButton({ nav.go(Routes.goalEdit()) }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Neues Ziel") }) }) {
+    SubScreen("Ziele", nav.back, floating = { ExtendedFloatingActionButton(onClick = { nav.go(Routes.goalEdit()) }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Neues Ziel") }) }) {
         if (all.isEmpty()) EmptyState("Noch keine Ziele", "Ein Ziel hilft dir, etwas regelmäßig zu tun: täglich, ein paarmal pro Woche oder an festen Wochentagen.", actionLabel = "Erstes Ziel anlegen", onAction = { nav.go(Routes.goalEdit()) })
         active.forEachIndexed { i, o ->
             val c = groupColor(o.goal.colorIndex)

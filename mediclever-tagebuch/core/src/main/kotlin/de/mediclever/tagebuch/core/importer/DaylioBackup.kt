@@ -303,7 +303,7 @@ object DaylioBackup {
                     id = id("mood", sourceId),
                     level = level,
                     name = name,
-                    icon = "mood$level",
+                    icon = "a",
                     sortOrder = obj.int("mood_group_order", "order") ?: 0,
                     archivedAt = archived(obj),
                     updatedAt = now,
