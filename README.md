@@ -44,3 +44,7 @@ plugins/
 
 Weitere Plugins koennen unter `plugins/<plugin-name>/` angelegt und anschliessend in
 `.claude-plugin/marketplace.json` registriert werden.
+
+## Weitere Projekte in diesem Repository
+
+- [`mediclever-tagebuch/`](mediclever-tagebuch/) – MediClever Tagebuch: WordPress-Plugin mit Web-App und MCP-Endpunkt. Eigenständiges Projekt, hat mit dem Plugin-Marktplatz nichts zu tun und liegt nur vorläufig hier.
