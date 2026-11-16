@@ -40,7 +40,7 @@ export interface Boot {
 export interface Streaks { current: number; longest: number; days_total: number; last5: { date: string; done: boolean }[] }
 export interface Home {
   month: string; today: string; entries: Entry[]; months: { month: string; n: string }[]; goals: Goal[]; milestones: Milestone[];
-  lookback: { years_ago: number; count: number } | null; streak: Streaks;
+  lookback: { years_ago: number; count: number; years: number } | null; streak: Streaks;
 }
 export interface DayStat { date: string; avg: number; n: number; tags: number[]; moods: number[] }
 export interface ScaleStat { scale_id: number; series: { date: string; value: number }[]; avg: number | null; n: number; prev_avg: number | null; change: number | null }

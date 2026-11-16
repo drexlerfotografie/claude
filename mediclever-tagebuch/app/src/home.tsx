@@ -237,7 +237,8 @@ export function HomeScreen(): JSX.Element {
         {isNow && feature('goals') && <GoalsToday goals={data.goals} today={boot.today} />}
         {isNow && data.lookback && (
           <a class="mct-mark" href="#/mehr/rueckblick"><Icon name="rotate-ccw" size={20} />
-            <span><strong>Vor {data.lookback.years_ago === 1 ? '1 Jahr' : `${data.lookback.years_ago} Jahren`}</strong><small>{plural(data.lookback.count, 'Eintrag', 'Einträge')} von diesem Tag</small></span></a>
+            <span><strong>Vor {data.lookback.years_ago === 1 ? '1 Jahr' : `${data.lookback.years_ago} Jahren`}</strong>
+              <small>{plural(data.lookback.count, 'Eintrag', 'Einträge')} von diesem Tag{data.lookback.years > 1 ? ' · weitere aus früheren Jahren' : ''}</small></span></a>
         )}
         {!isNow && <button type="button" class="mct-btn ghost block" onClick={() => setMonth(boot.today.slice(0, 7))}><Icon name="calendar" size={18} />Heute anzeigen</button>}
         {!isNow && feature('reports') && data.entries.length > 0 && (

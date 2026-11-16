@@ -296,10 +296,12 @@ final class Stats
         if (!$s['enough']) {
             return $h;
         }
-        $wd = array_values(array_filter($s['weekday_avg'], fn($w) => $w['n'] >= 2));
+        // Nur nennen, wenn der Wochentag mit dem höchsten Schnitt auch mindestens zwei Einträge hat.
+        // Sonst widerspräche der Hinweis dem Diagramm oder stützte sich auf einen einzelnen Tag.
+        $wd = array_values(array_filter($s['weekday_avg'], fn($w) => $w['n'] >= 1));
         if (count($wd) >= 2) {
             usort($wd, fn($a, $b) => $b['avg'] <=> $a['avg']);
-            if ($wd[0]['avg'] > end($wd)['avg']) {
+            if ($wd[0]['n'] >= 2 && $wd[0]['avg'] > $wd[1]['avg']) {
                 $h[] = sprintf('Dein bester Wochentag war der %s.', self::WEEKDAYS[$wd[0]['weekday']]);
             }
         }
@@ -427,7 +429,8 @@ final class Stats
         $entries = (int) Db::val('SELECT COUNT(*) FROM ' . Db::t('entries') . ' WHERE user_id = %d', [$uid]);
         $first = Db::val('SELECT MIN(local_date) FROM ' . Db::t('entries') . ' WHERE user_id = %d', [$uid]);
         $checks = (int) Db::val('SELECT COUNT(*) FROM ' . Db::t('goal_checks') . ' WHERE user_id = %d', [$uid]);
-        $photos = (int) Db::val('SELECT COUNT(*) FROM ' . Db::t('assets') . " WHERE user_id = %d AND type = 'photo'", [$uid]);
+        // Gezählt werden die Fotos an Einträgen, wie in der Galerie.
+        $photos = (int) Db::val('SELECT COUNT(*) FROM ' . Db::t('entry_assets') . ' ea JOIN ' . Db::t('assets') . " a ON a.id = ea.asset_id WHERE ea.user_id = %d AND a.type = 'photo'", [$uid]);
         $streak = self::streaks($uid);
         $years = $first ? (int) floor((strtotime(Settings::today($uid)) - strtotime($first)) / (365.25 * 86400)) : 0;
         $defs = [

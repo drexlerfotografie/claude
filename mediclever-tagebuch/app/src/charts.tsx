@@ -21,7 +21,9 @@ interface LineProps {
 export function LineChart(p: LineProps): JSX.Element {
   const t = theme();
   const W = 340, H = 170, L = 34, R = 8, T = 10, B = 24;
-  const sx = (x: number) => L + ((x - 1) / Math.max(1, p.xMax - 1)) * (W - L - R);
+  // Balken brauchen links und rechts Platz, sonst liegt der erste auf der Achsenbeschriftung.
+  const pad = p.bars ? Math.min(22, (W - L - R) / p.xMax / 2 + 2) : 4;
+  const sx = (x: number) => L + pad + ((x - 1) / Math.max(1, p.xMax - 1)) * (W - L - R - 2 * pad);
   // Bei Balken beginnt die Achse etwas unter dem kleinsten Wert, damit auch dieser als Balken sichtbar bleibt.
   const lo = p.bars ? p.yMin - (p.yMax - p.yMin) * 0.14 : p.yMin;
   const sy = (y: number) => T + (1 - (y - lo) / (p.yMax - lo)) * (H - T - B);
@@ -38,7 +40,7 @@ export function LineChart(p: LineProps): JSX.Element {
       {p.yTicks.map((k) => (
         <g key={k.v}>
           <line x1={L} x2={W - R} y1={sy(k.v)} y2={sy(k.v)} stroke={t.line} stroke-width="1" />
-          <text x={L - 6} y={sy(k.v) + 4} text-anchor="end" font-size="10" fill={t.muted}>{k.label}</text>
+          <text x={L - 6} y={sy(k.v) + 4} text-anchor="end" font-size="11" fill={t.muted}>{k.label}</text>
         </g>
       ))}
       {p.xTicks.map((k) => <text key={k.v} x={sx(k.v)} y={H - 6} text-anchor="middle" font-size="10" fill={t.muted}>{k.label}</text>)}

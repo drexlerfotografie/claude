@@ -21,6 +21,7 @@ function StatCard({ title, children, share = true }: { title: string; children: 
 }
 
 const scoreColor = (colors: string[]) => (y: number) => colors[Math.max(0, Math.min(4, Math.round(5 - y)))];
+const AXIS_LEGEND = 'Achse: ++ sehr gut · + gut · o mittel · − schlecht · −− sehr schlecht';
 const moodTicks = [1, 2, 3, 4, 5].map((v) => ({ v, label: ['', '−−', '−', 'o', '+', '++'][v] }));
 
 function ScaleCard({ st, scale, month, year }: { st: ScaleStat; scale: Scale; month: string; year: boolean }): JSX.Element {
@@ -92,7 +93,7 @@ export function StatsScreen(): JSX.Element {
             <div class="mct-last5" aria-label="Die letzten fünf Tage">
               {data.streaks.last5.map((d) => <span key={d.date} class={d.done ? 'on' : ''} title={dayLabel(d.date)}><Icon name={d.done ? 'check' : 'minus'} size={16} label={`${dayLabel(d.date)}: ${d.done ? 'Eintrag vorhanden' : 'kein Eintrag'}`} /><small>{WD_SHORT[parseDate(d.date).getDay()]}</small></span>)}
             </div>
-            <p class="mct-muted">Längste Reihe: {plural(data.streaks.longest, 'Tag', 'Tage')}</p>
+            <p class="mct-muted">Längste Serie: {plural(data.streaks.longest, 'Tag', 'Tage')}</p>
           </Card>
           {!data.enough ? (
             <Card class="span2">
@@ -112,6 +113,7 @@ export function StatsScreen(): JSX.Element {
                   desc={`Durchschnitt ${num(data.avg)} von 5 bei ${data.count} Einträgen`}
                   xTicks={isYear ? [1, 4, 7, 10].map((v) => ({ v, label: MONTHS[v - 1].slice(0, 3) })) : [1, 8, 15, 22, 29].filter((v) => v <= xMax).map((v) => ({ v, label: String(v) }))} />
                 <p data-share><strong>Durchschnitt: {num(data.avg)} von 5</strong> · {plural(data.count, 'Eintrag', 'Einträge')}</p>
+                <p class="mct-muted small">{AXIS_LEGEND}</p>
                 <div class="mct-btnrow wrap">
                   <Segmented label="Darstellung" value={bars ? 'b' : 'l'} onChange={(v) => setBars(v === 'b')} options={[{ value: 'l', label: 'Linie' }, { value: 'b', label: 'Balken' }]} />
                   {!isYear && (overlay
@@ -147,6 +149,7 @@ export function StatsScreen(): JSX.Element {
                   desc={wd.filter((w) => w.avg !== null).map((w) => `${WD_SHORT[w.weekday % 7]} ${num(w.avg)}`).join(', ')}
                   xTicks={wd.map((w, i) => ({ v: i + 1, label: WD_SHORT[w.weekday % 7] }))} />
                 {wd.filter((w) => w.avg !== null).map((w) => <span key={w.weekday} data-share hidden>{WD_SHORT[w.weekday % 7]}: {num(w.avg)}</span>)}
+                <p class="mct-muted small">{AXIS_LEGEND}</p>
               </StatCard>
               <StatCard title="Einfluss auf die Stimmung">
                 {pos.length + neg.length === 0 ? <p class="mct-muted">Dafür braucht es Aktivitäten, die an mehreren Tagen vorkommen.</p> : (

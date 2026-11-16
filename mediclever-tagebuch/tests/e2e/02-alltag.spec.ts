@@ -23,6 +23,7 @@ test.describe('Alltag mit Beispieldaten', () => {
     await page.getByRole('button', { name: /September/ }).click();
     await expect(page.locator('.mct-entry').first()).toContainText('September');
     await page.getByRole('button', { name: 'Heute anzeigen' }).click();
+    await expect(page.locator('.mct-entry').first()).toContainText('November');
 
     // Bearbeiten
     const first = page.locator('.mct-entry').first();
@@ -232,7 +233,7 @@ test.describe('Alltag mit Beispieldaten', () => {
     await page.getByRole('radio', { name: 'Monat' }).click();
     await expect(page.locator('.mct-yearbar strong')).toContainText('2026');
     await open(page, '/mehr/rueckblick');
-    await expect(page.getByRole('heading', { name: /Vor einem Jahr · 2025/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Vor 1 Jahr · 2025/ })).toBeVisible();
     await expect(page.locator('.mct-entry').first()).toContainText('Schöner Abend am See.');
     await open(page, '/mehr/fotos');
     await expect(page.locator('.mct-gallery img').first()).toBeVisible();

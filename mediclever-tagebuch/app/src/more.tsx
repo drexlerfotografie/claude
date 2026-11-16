@@ -39,7 +39,7 @@ export function MoreScreen(): JSX.Element {
         <Card title="Daten und Konto">
           <div class="mct-rows">
             {(f('import') || f('export') || f('backup')) && <Row icon="download" label="Daten" hint="Import, Export, Sicherung" to="/mehr/daten" />}
-            {f('mcp') && <Row icon="bot" label="KI-Zugriff" hint={boot.settings.ai_consent_at ? 'eingewilligt' : 'aus'} to="/mehr/ki" />}
+            {f('mcp') && <Row icon="bot" label="KI-Zugriff" hint={boot.settings.ai_consent_at ? 'Einwilligung erteilt' : 'KI-Zugriff ist aus'} to="/mehr/ki" />}
             <Row icon="user" label="MediClever-Konto" hint={boot.user.name} to="/mehr/konto" />
           </div>
         </Card>
@@ -159,7 +159,7 @@ function GoalDetail({ goal, onClose, onEdit }: { goal: Goal; onClose: () => void
           return <button type="button" key={d} disabled={d > boot.today} class={checks.has(d) ? 'on' : ''} aria-pressed={checks.has(d)} aria-label={`${dayLabel(d)}${checks.has(d) ? ', abgehakt' : ''}`} onClick={() => toggle(d)}>{i + 1}</button>;
         })}
       </div>
-      {months.length > 0 && <><h3>Abschlüsse je Monat</h3><div class="mct-monthbars">{months.map(([m, n]) => <div key={m}><strong>{n}</strong><span>{MONTHS[Number(m.slice(5)) - 1].slice(0, 3)}</span></div>)}</div></>}
+      {months.length > 0 && <><h3>Abschlüsse je Monat (letzte {months.length === 1 ? 'Monat' : `${months.length} Monate`} mit Abschluss)</h3><div class="mct-monthbars">{months.map(([m, n]) => <div key={m}><strong>{n}</strong><span>{MONTHS[Number(m.slice(5)) - 1].slice(0, 3)}</span></div>)}</div></>}
       {g.note && <p>{g.note}</p>}
       <div class="mct-btnrow wrap">
         <button type="button" class="mct-btn ghost" onClick={onEdit}><Icon name="pencil" size={18} />Bearbeiten</button>
@@ -183,7 +183,7 @@ export function GoalsScreen({ route }: { route: Route }): JSX.Element {
     <Page title="Ziele" back="/mehr" actions={<button type="button" class="mct-iconbtn" aria-label="Neues Ziel" onClick={() => setEdit('new')}><Icon name="plus" /></button>}>
       {active.length === 0 && <Empty icon="target" title="Noch kein Ziel" text="Ein Ziel kann täglich, mehrmals pro Woche oder an festen Wochentagen fällig sein."><button type="button" class="mct-btn primary" onClick={() => setEdit('new')}>Ziel anlegen</button></Empty>}
       {active.length > 0 && (
-        <SortList items={active} id={(g) => String(g.id)} label={(g) => g.name} onChange={(items) => post('/reorder', { kind: 'goals', ids: items.map((g) => g.id) }).then(changed, fail)}
+        <Card><SortList items={active} id={(g) => String(g.id)} label={(g) => g.name} onChange={(items) => post('/reorder', { kind: 'goals', ids: items.map((g) => g.id) }).then(changed, fail)}
           render={(g) => (
             <div class="mct-goal">
               <button type="button" class={'mct-check' + (g.done_today ? ' on' : '')} aria-pressed={g.done_today} aria-label={`${g.name} für heute abhaken`} onClick={() => toggle(g)}><Icon name={g.done_today ? 'check' : 'target'} /></button>
@@ -192,7 +192,7 @@ export function GoalsScreen({ route }: { route: Route }): JSX.Element {
                 <small>{FREQ(g)} · Serie {g.streak} · {g.rate30} % in 30 Tagen</small>
               </button>
             </div>
-          )} />
+          )} /></Card>
       )}
       {archived.length > 0 && (
         <>
@@ -347,7 +347,7 @@ export function LookbackScreen(): JSX.Element {
         ? <Empty icon="rotate-ccw" title="Nichts aus früheren Jahren" text="An diesem Tag gibt es noch keine älteren Einträge." />
         : data.years.map((y) => (
           <section key={y.year}>
-            <h2 class="mct-section">Vor {y.years_ago === 1 ? 'einem Jahr' : `${y.years_ago} Jahren`} · {y.year}</h2>
+            <h2 class="mct-section">Vor {y.years_ago === 1 ? '1 Jahr' : `${y.years_ago} Jahren`} · {y.year}</h2>
             <div class="mct-feed">{y.entries.map((e) => <EntryCard key={e.id} e={e} l={lookup(boot)} showYear />)}</div>
           </section>
         ))}
@@ -399,7 +399,7 @@ export function AchievementsScreen(): JSX.Element {
                 <ul class="mct-badges">
                   {list.map((a) => (
                     <li key={a.key} class={a.reached ? 'on' : ''}>
-                      <span class="mct-badge"><Icon name={BADGE_ICON[g] || 'award'} size={24} /><b>{a.target >= 1000 ? `${a.target / 1000}k` : a.target}</b></span>
+                      <span class="mct-badge"><Icon name={BADGE_ICON[g] || 'award'} size={24} /><b>{a.target.toLocaleString('de-DE')}</b></span>
                       <span><strong>{a.name}</strong><small>{a.reached ? 'Erreicht' : `${a.value} von ${a.target}`}</small></span>
                     </li>
                   ))}

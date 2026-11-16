@@ -78,7 +78,8 @@ for ($d = 60; $d >= 1; $d--) {
     $date = date('Y-m-d', strtotime("-$d days", strtotime($today)));
     if ($d <= 6 || mt_rand(0, 9) < 7) { MCT\Goals::check($u, $g2['id'], $date, true); }
 }
-foreach (MCT\Db::col('SELECT e.local_date FROM ' . MCT\Db::t('entries') . ' e JOIN ' . MCT\Db::t('entry_tags') . ' t ON t.entry_id = e.id WHERE e.user_id = %d AND t.tag_id = %d', [$u, $tags['Sport']]) as $date) {
+foreach (MCT\Db::col('SELECT e.local_date FROM ' . MCT\Db::t('entries') . ' e JOIN ' . MCT\Db::t('entry_tags') . ' t ON t.entry_id = e.id WHERE e.user_id = %d AND t.tag_id = %d AND e.local_date >= %s',
+    [$u, $tags['Sport'], $g1['start_date']]) as $date) {
     MCT\Goals::check($u, $g1['id'], $date, true);
 }
 $in5 = date('m-d', strtotime('+5 days', strtotime($today)));

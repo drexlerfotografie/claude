@@ -206,3 +206,28 @@ Alle Zahlen rechnet der Server. Jede Auswertung ist gegen eine von Hand nachgere
 | Eintrag über MCP anlegen, erscheint in der App | ja (lokal, mit dem offiziellen SDK) |
 | Monatsansicht unter 300 ms | ja (rund 1.800 erfundene Einträge) |
 | axe ohne schwere Fehler | ja (33 Bildschirme, vier Varianten) |
+
+## Unabhängige Gegenprüfung (16.11.2026)
+
+Ein frischer Prüfer ohne Kenntnis der Umsetzung hat 67 Screenshots (alle 33 in „mobil-hell“, dazu 18, 11 und 5 aus den anderen Varianten) gegen `docs/bildschirme.md` geprüft. Referenzbilder des Vorbilds hatte auch er nicht.
+
+Urteil vor der Nachbesserung: 15 Bildschirme „erfüllt“, 15 „erfüllt mit Mängeln“, 3 „nicht erfüllt“ (Eintrag Schritt 1, Statistik, Ziel-Detail am Desktop). 34 Einzelbefunde.
+
+| Befund | Umgang |
+| --- | --- |
+| Hinweis „bester Wochentag“ widersprach dem Diagramm | behoben, Test `wochentags_hinweis_widerspricht_dem_diagramm_nicht` |
+| Fortschrittsbalken im Ziel-Detail fehlte am Desktop; Rahmen im Skalen-Dialog überlappt | behoben (Inhalte wurden im scrollenden Dialog gestaucht) |
+| Balken lag auf der Achsenbeschriftung; Achse „++ … −−“ ohne Erklärung | behoben, Legende ergänzt |
+| Aktivitätsnamen mitten im Wort umbrochen | behoben (breitere Spalten, deutsche Silbentrennung) |
+| Erfolge zählten 9 Fotos, Galerie 8 | behoben, Test `erfolge_zaehlen_fotos_wie_die_galerie` |
+| „Vor 1 Jahr · 2 Einträge“ meinte alle Jahre | behoben |
+| Ziel-Detail: Abschlüsse vor dem Startdatum, Monatssumme ohne Hinweis | Beispieldaten korrigiert, Überschrift präzisiert |
+| Sichtbarer Fokusrahmen um den ganzen Inhalt; Ziffern der Anleitung ragten aus der Karte; fehlende Abstände (PIN, Überschriften) | behoben |
+| „1k“, „Längste Reihe“, „Vor einem Jahr“ neben „Vor 1 Jahr“, „aus“, Dateiendung der anderen App im Text | behoben |
+| Ziele-Liste ohne Kartenform; Kalender am Desktop schmaler; Fotoraster am Desktop grob; Dialog im dunklen Modus ohne Kante | behoben |
+| Datum und Uhrzeit im US-Format (Schritt 1) | **kein Fehler der App:** native Eingabefelder folgen der Sprache des Browsers, und der Test-Browser läuft englisch. Am deutschen Gerät erscheint TT.MM.JJJJ. Am Handy gegenprüfen. |
+| Desktop: ungleich hohe Karten im zweispaltigen Raster, einzelne Karte neben leerer Fläche | **offen**, gering |
+| Stimmungsfilter in der Suche nur als Symbole (mit Vorlesetext und Tooltip) | **offen**, gering |
+| Fotos im Bericht, Monatsbericht-Karte, Karte für wichtige Tage, Archive, Schieber-Skala, Import-Vorschau | aus den Screenshots nicht beurteilbar (zustandsabhängig); teils durch Ablauf-Tests belegt |
+
+Eine zweite Gegenprüfung nach der Nachbesserung hat **nicht** stattgefunden. Die Spalte „erfüllt“ oben stützt sich deshalb auf die automatischen Tests und diese eine Prüfrunde, nicht auf ein abschließendes „erfüllt“ des Prüfers je Punkt.

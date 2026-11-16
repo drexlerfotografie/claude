@@ -205,7 +205,7 @@ function App(): JSX.Element {
   const colors = levelColors(set?.color_scheme || 'klar', set?.custom_colors || []);
   const style = Object.fromEntries(colors.map((c, i) => [`--l${i + 1}`, c]));
   const wrap = (child: JSX.Element, bare = false) => (
-    <div class={'mct' + (bare ? ' bare' : '')} data-mode={mode} data-font={set?.font || 'roboto'} style={style}>
+    <div class={'mct' + (bare ? ' bare' : '')} lang="de" data-mode={mode} data-font={set?.font || 'roboto'} style={style}>
       {child}<DialogHost /><Toasts />
     </div>
   );

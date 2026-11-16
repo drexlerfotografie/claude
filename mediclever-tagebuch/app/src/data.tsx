@@ -163,7 +163,7 @@ function ImportBackup({ b, onDone }: { b: Backup; onDone: () => void }): JSX.Ele
   }
   return (
     <Card title="Vorschau">
-      <p class="mct-muted">{b.own ? 'MediClever-Sicherung' : 'Backup-Datei'} · {b.file.name}</p>
+      <p class="mct-muted">{b.own ? 'MediClever-Sicherung' : 'Sicherung aus anderer App'} · {b.file.name}</p>
       <table class="mct-table">
         <tbody>
           <tr><th scope="row">Einträge</th><td>{list(j, 'dayEntries').length}</td></tr>
@@ -275,7 +275,7 @@ export function DataScreen(): JSX.Element {
       {feature('import') && !backup && !csv && (
         <Card title="Import und Wiederherstellen">
           {!boot.settings.consent_at && <div class="mct-hint warn">Für den Import brauchst du zuerst deine Einwilligung unter „MediClever-Konto“.</div>}
-          <p>Du kannst eine Backup-Datei (.daylio), eine MediClever-Sicherung (.mctb) oder eine CSV-Datei importieren. Die Datei wird auf deinem Gerät geöffnet und in kleinen Paketen übertragen.</p>
+          <p>Du kannst die Sicherungsdatei deiner bisherigen Tagebuch-App, eine MediClever-Sicherung (.mctb) oder eine CSV-Datei importieren. Die Datei wird auf deinem Gerät geöffnet und in kleinen Paketen übertragen.</p>
           <label class="mct-btn primary"><Icon name="upload" size={18} />{busy ? 'Datei wird gelesen …' : 'Datei wählen'}
             <input class="mct-sr" type="file" accept=".daylio,.mctb,.zip,.csv,text/csv,application/zip" disabled={busy} onChange={(e) => pick((e.target as HTMLInputElement).files?.[0])} /></label>
           {error && <p class="mct-error" role="alert">{error}</p>}

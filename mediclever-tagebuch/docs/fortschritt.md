@@ -4,7 +4,7 @@ Stand: 16.11.2026, Ende der ersten Sitzung.
 
 ## Kurz
 
-Plugin, Web-App und MCP-Endpunkt sind gebaut und laufen lokal. `npm run verify` ist grün: 59 PHPUnit-Tests, 30 Playwright-Tests, Screenshots von 33 Bildschirmen in vier Varianten, axe ohne schwere Fehler.
+Plugin, Web-App und MCP-Endpunkt sind gebaut und laufen lokal. `npm run verify` ist grün: 61 PHPUnit-Tests, 30 Playwright-Tests, Screenshots von 33 Bildschirmen in vier Varianten, axe ohne schwere Fehler. Eine unabhängige Gegenprüfung der Screenshots hat 34 Befunde geliefert; bis auf zwei geringe sind sie eingearbeitet (siehe `abnahme.md`, letzter Abschnitt). Eine zweite Prüfrunde steht aus.
 
 **Fertig im Sinne der Projektbeschreibung ist das Projekt nicht.** Es fehlt die Abnahme gegen das Vorbild (Video) und gegen das echte Backup, weil beides in dieser Sitzung nicht vorlag. Dazu kommen Punkte, die nur auf dem Live-System oder am Handy prüfbar sind.
 
@@ -43,6 +43,7 @@ Abweichung von der Arbeitsweise: Die Projektbeschreibung sieht acht Meilensteine
 - Zeilenumbrüche in per MCP angelegten Notizen wurden verdoppelt.
 - Im Wochentags-Diagramm war der Balken der schlechtesten Stufe unsichtbar.
 - Barrierefreiheit: drei Schaltflächen, deren vorgelesener Name nicht zur sichtbaren Beschriftung passte.
+- Aus der Gegenprüfung: Hinweis „bester Wochentag“ widersprach dem Diagramm; Inhalte in Dialogen wurden am Desktop gestaucht (Fortschrittsbalken fehlte); Erfolge und Galerie zählten Fotos unterschiedlich.
 
 ## Nächster Schritt
 

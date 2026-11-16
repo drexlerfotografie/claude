@@ -49,6 +49,36 @@ final class StatsGoalsTest extends Base
         $this->assertSame([['tag_id' => $x['a'], 'n' => 2]], $level1['tags']);
     }
 
+    public function test_wochentags_hinweis_widerspricht_dem_diagramm_nicht(): void
+    {
+        $u = $this->user();
+        // Dienstag hat den höchsten Schnitt, aber nur einen Eintrag: kein Hinweis auf einen „besten Wochentag“.
+        $this->entry($u, '2026-03-03', 1);
+        $this->entry($u, '2026-03-06', 2);
+        $this->entry($u, '2026-03-13', 3);
+        $hints = implode(' ', MCT\Stats::month($u, '2026-03')['hints']);
+        $this->assertStringNotContainsString('bester Wochentag', $hints);
+        // Ein zweiter guter Dienstag macht ihn zum belegten besten Tag.
+        $this->entry($u, '2026-03-10', 1);
+        $this->assertContains('Dein bester Wochentag war der Dienstag.', MCT\Stats::month($u, '2026-03')['hints']);
+    }
+
+    public function test_erfolge_zaehlen_fotos_wie_die_galerie(): void
+    {
+        $u = $this->user();
+        $im = imagecreatetruecolor(20, 20);
+        ob_start();
+        imagejpeg($im);
+        $bytes = ob_get_clean();
+        $at_entry = MCT\Assets::store($u, $bytes)['id'];
+        $at_milestone = MCT\Assets::store($u, $bytes)['id'];
+        $this->entry($u, '2026-03-03', 2, ['asset_ids' => [$at_entry]]);
+        MCT\Milestones::save($u, ['name' => 'Tag', 'date' => '2020-01-01', 'asset_id' => $at_milestone]);
+        $photos = array_column(MCT\Stats::achievements($u)['achievements'], null, 'key')['photos-50'];
+        $this->assertSame(1, $photos['value']);
+        $this->assertSame(1, MCT\Assets::gallery($u)['total']);
+    }
+
     public function test_leerzustand_bei_zu_wenig_daten(): void
     {
         $u = $this->user();

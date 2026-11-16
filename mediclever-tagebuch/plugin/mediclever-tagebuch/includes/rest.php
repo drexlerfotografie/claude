@@ -172,7 +172,7 @@ final class Rest
                 'milestones' => Features::enabled('milestones', $u) ? Milestones::all($u) : [], 'lookback' => null, 'streak' => Stats::streaks($u)];
             if (Features::enabled('lookback', $u) && Settings::get($u)['lookback']) {
                 $lb = Stats::lookback($u, $today);
-                $out['lookback'] = $lb['years'] ? ['years_ago' => $lb['years'][0]['years_ago'], 'count' => array_sum(array_map(fn($y) => count($y['entries']), $lb['years']))] : null;
+                $out['lookback'] = $lb['years'] ? ['years_ago' => $lb['years'][0]['years_ago'], 'count' => count($lb['years'][0]['entries']), 'years' => count($lb['years'])] : null;
             }
             return $out;
         });
