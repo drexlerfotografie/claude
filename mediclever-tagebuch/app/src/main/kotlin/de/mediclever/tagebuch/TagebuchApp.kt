@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 class AppContainer(app: Application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val db = AppDatabase.open(app)
-    val prefs = LocalPrefs(app)
+    val prefs = LocalPrefs(app, CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.IO))
     val assets = AssetStore(app)
     val repo = DiaryRepository(db, prefs, assets, scope)
     val auth = AuthManager(app)
@@ -40,6 +40,9 @@ class AppContainer(app: Application) {
         // Widget aktuell halten
         scope.launch { repo.diary.filterNotNull().map { d -> d.entries.firstOrNull()?.let { it.id to it.updatedAt } }.distinctUntilChanged().collect { de.mediclever.tagebuch.widget.TodayWidget.refresh(app) } }
     }
+
+    /** Nur fuer Tests: beendet Hintergrundarbeit und gibt Dateien frei. */
+    fun close() { scope.coroutineContext[kotlinx.coroutines.Job]?.cancel(); db.close() }
 }
 
 class TagebuchApp : Application() {

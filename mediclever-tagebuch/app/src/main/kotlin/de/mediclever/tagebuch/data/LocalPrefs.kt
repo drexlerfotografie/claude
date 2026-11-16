@@ -7,14 +7,15 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.preferencesDataStoreFile
+import kotlinx.coroutines.CoroutineScope
 import de.mediclever.tagebuch.core.model.Table
 import de.mediclever.tagebuch.core.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.store: DataStore<Preferences> by preferencesDataStore("tagebuch")
 
 /** Was nur dieses Geraet betrifft, plus die Nutzer-Einstellungen als JSON. */
 data class LocalState(
@@ -34,7 +35,10 @@ data class LocalState(
 )
 
 class LocalPrefs(private val store: DataStore<Preferences>) {
-    constructor(context: Context) : this(context.applicationContext.store)
+    /** scope bestimmt die Lebensdauer: endet er, gibt der Speicher seine Datei wieder frei. */
+    constructor(context: Context, scope: CoroutineScope) : this(
+        PreferenceDataStoreFactory.create(scope = scope) { context.applicationContext.preferencesDataStoreFile("tagebuch") },
+    )
 
     private object K {
         val settings = stringPreferencesKey("settings")
