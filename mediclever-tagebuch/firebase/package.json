@@ -1,0 +1,19 @@
+{
+  "name": "mediclever-tagebuch-firebase",
+  "private": true,
+  "description": "Firestore-Regeln und Regeltests für MediClever Tagebuch",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-mediclever-tagebuch \"node --test --test-concurrency=1 test/*.test.mjs\"",
+    "emulators": "firebase emulators:start --project demo-mediclever-tagebuch",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.36.0"
+  }
+}
