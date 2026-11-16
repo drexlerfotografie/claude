@@ -114,6 +114,11 @@ fun DataScreen() {
                     Row { RadioButton(mode == MergeMode.EMPTY_ONLY, { mode = MergeMode.EMPTY_ONLY }, enabled = empty); Column { Text("In ein leeres Tagebuch"); Text(if (empty) "Übernimmt auch die Einrichtung der Datei." else "Nur möglich, solange es keine Einträge gibt.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                     Row { RadioButton(mode == MergeMode.MERGE, { mode = MergeMode.MERGE }); Column { Text("Mit dem bestehenden zusammenführen"); Text("Gleichnamige Stimmungen, Aktivitäten und Skalen werden zugeordnet. Nichts wird doppelt angelegt.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                     if (progress.isNotEmpty()) Text(progress)
+                    if (o.kind.contains("Daylio")) {
+                        HorizontalDivider()
+                        Text("Stimmt nach dem Import etwas nicht, etwa Farben oder Stufen? Der Strukturbericht hilft bei der Fehlersuche. Er enthält nur Feldnamen und Zahlen, keine Namen, Notizen oder Titel.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton({ scope.launch { runCatching { shareFile(context, c!!.dataOps.structureReport(o), "text/plain", "Strukturbericht teilen") } } }, enabled = c != null) { Text("Strukturbericht teilen") }
+                    }
                 } },
                 confirmButton = { TextButton({
                     busy = "Import läuft …"

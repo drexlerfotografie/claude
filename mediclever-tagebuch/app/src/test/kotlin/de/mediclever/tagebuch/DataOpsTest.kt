@@ -136,3 +136,17 @@ class FakeServer : de.mediclever.tagebuch.core.sync.RemoteStore {
     override suspend fun pullSettings() = settings
     override suspend fun pushSettings(settings: de.mediclever.tagebuch.core.model.UserSettings) { this.settings = settings }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class StructureReportTest {
+    @Test fun reportIsWrittenForDaylioBackups() = runBlocking {
+        val c = (ApplicationProvider.getApplicationContext<Application>() as TagebuchApp).container
+        try {
+            val opened = c.dataOps.open(Uri.fromFile(File("../tests/fixtures/sample.daylio"))) as Opened.Archive
+            val text = c.dataOps.structureReport(opened).readText()
+            assertTrue(text.startsWith("Strukturbericht (ohne Inhalte)"))
+            assertTrue("mood_group_id" in text && "Hinweise des Imports" in text)
+        } finally { c.close() }
+    }
+}

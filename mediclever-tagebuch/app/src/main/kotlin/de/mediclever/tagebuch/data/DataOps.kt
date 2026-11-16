@@ -142,6 +142,16 @@ class DataOps(private val context: Context, private val repo: DiaryRepository) {
         }
     }
 
+    /** Strukturbericht eines Daylio-Backups: Feldnamen und Zahlen, keine Texte. Fuer die Fehlersuche beim Import. */
+    suspend fun structureReport(opened: Opened.Archive): File = withContext(Dispatchers.IO) {
+        val json = ZipFile(opened.file).use { z ->
+            val entry = z.entries().asSequence().firstOrNull { it.name.endsWith("backup.daylio") } ?: throw ImportException("Für diese Datei gibt es keinen Strukturbericht.")
+            DaylioBackup.decodeBackupText(z.getInputStream(entry).readBytes())
+        }
+        val text = DaylioDiagnostics.describe(json) + "\nHinweise des Imports:\n" + opened.result.warnings.joinToString("\n") { "- $it" }
+        File(File(context.cacheDir, "share").apply { mkdirs() }, "strukturbericht.txt").apply { writeText(text) }
+    }
+
     suspend fun importArchive(opened: Opened.Archive, mode: MergeMode, onProgress: (Int, Int) -> Unit): ImportOutcome = withContext(Dispatchers.IO) {
         val existing = repo.snapshot()
         val merged = DiaryMerge.merge(existing, opened.result.diary, mode)
