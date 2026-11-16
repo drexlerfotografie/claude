@@ -132,13 +132,9 @@ final class ImportExportTest extends Base
     {
         $u = $this->user();
         $this->entry($u, '2026-01-01', 2);
-        try {
-            MCT\Import::start($u, 'leerentest0001', 'new', false);
-            $this->fail('Ohne Bestätigung darf nichts gelöscht werden');
-        } catch (MCT\Fail $f) {
-            $this->assertSame('not_empty', $f->slug);
-            $this->assertSame(1, $f->data['count']);
-        }
+        $ask = MCT\Import::start($u, 'leerentest0001', 'new', false);
+        $this->assertTrue($ask['needs_confirm'], 'ohne Bestätigung darf nichts gelöscht werden');
+        $this->assertSame(1, $ask['count']);
         $this->assertSame(1, MCT\Import::counts($u)['entries']);
         MCT\Import::start($u, 'leerentest0001', 'new', true);
         $this->assertSame(0, MCT\Import::counts($u)['entries']);
@@ -232,7 +228,11 @@ final class ImportExportTest extends Base
     public function test_monatsansicht_mit_grossem_bestand_antwortet_schnell(): void
     {
         $u = $this->user();
-        $this->importFixture($u, 'fixturerun0001', false);
+        // Viermal die Testdatei: rund 1.800 Einträge, so viele wie im echten Bestand.
+        foreach (['fixturerun0001', 'fixturerun0002', 'fixturerun0003', 'fixturerun0004'] as $run) {
+            $this->importFixture($u, $run, false);
+        }
+        $this->assertGreaterThan(1765, MCT\Import::counts($u)['entries']);
         $t = microtime(true);
         $res = $this->rest($u, 'GET', '/home', ['month' => '2026-10']);
         $ms = (microtime(true) - $t) * 1000;

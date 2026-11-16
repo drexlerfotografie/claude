@@ -24,7 +24,7 @@ final class Import
         'schreib' => 'pen-line', 'party' => 'party-popper', 'feier' => 'party-popper', 'konzert' => 'mic', 'geburtstag' => 'cake', 'geld' => 'wallet', 'sonne' => 'sun',
         'regen' => 'cloud-rain', 'wetter' => 'cloud-sun', 'schnee' => 'snowflake', 'frei' => 'coffee', 'pause' => 'coffee', 'telefon' => 'phone', 'handy' => 'smartphone',
         'social' => 'smartphone', 'computer' => 'laptop', 'program' => 'code', 'ehrenamt' => 'heart-handshake', 'feuerwehr' => 'flame', 'rettung' => 'siren', 'einsatz' => 'siren',
-        'natur' => 'trees', 'draußen' => 'trees', 'wald' => 'trees', 'stress' => 'activity', 'müde' => 'battery-low', 'energie' => 'battery', 'kirche' => 'church', 'tanz' => 'music-2',
+        'natur' => 'trees', 'draußen' => 'trees', 'wald' => 'trees', 'stress' => 'activity', 'müde' => 'battery-low', 'energie' => 'battery', 'kirche' => 'church', 'tanz' => 'disc',
     ];
 
     public static function icon_for(string $name): string
@@ -103,12 +103,14 @@ final class Import
         if ($mode === 'new' && !$resumed) {
             $entries = (int) Db::val('SELECT COUNT(*) FROM ' . Db::t('entries') . ' WHERE user_id = %d', [$uid]);
             if ($entries > 0 && !$confirm_wipe) {
-                throw new Fail('not_empty', sprintf('Dein Tagebuch enthält bereits %d Einträge. Sie werden beim Import in ein leeres Tagebuch gelöscht.', $entries), 409, ['count' => $entries]);
+                // Kein Fehler, sondern eine Rückfrage: Ohne Bestätigung wird nichts gelöscht.
+                return ['run_key' => $run, 'needs_confirm' => true, 'count' => $entries,
+                    'message' => sprintf('Dein Tagebuch enthält bereits %d Einträge. Sie werden beim Import in ein leeres Tagebuch gelöscht.', $entries)];
             }
             Account::wipe_diary($uid, true);
         }
         Audit::log($uid, 'import_start');
-        return ['run_key' => $run, 'resumed' => $resumed, 'status' => self::status($uid, $run)];
+        return ['run_key' => $run, 'needs_confirm' => false, 'resumed' => $resumed, 'status' => self::status($uid, $run)];
     }
 
     public static function status(int $uid, string $run): array

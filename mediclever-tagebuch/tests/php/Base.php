@@ -17,6 +17,14 @@ abstract class Base extends TestCase
         return $id;
     }
 
+    protected function setUp(): void
+    {
+        // Begrenzungen (Aufrufe pro Zeitfenster) liegen als Transients vor und dürfen nicht von Lauf zu Lauf wirken.
+        global $wpdb;
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_mct\\_rl\\_%' OR option_name LIKE '\\_transient\\_timeout\\_mct\\_rl\\_%'");
+        wp_cache_flush();
+    }
+
     protected function tearDown(): void
     {
         require_once ABSPATH . 'wp-admin/includes/user.php';

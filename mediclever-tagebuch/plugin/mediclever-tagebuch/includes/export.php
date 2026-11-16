@@ -153,9 +153,12 @@ final class Export
             throw new Fail('no_zip', 'Auf diesem Server fehlt die ZIP-Erweiterung.', 500);
         }
         @set_time_limit(300);
-        $tmp = wp_tempnam('mct-export');
+        // wp_tempnam() gibt es nur im Adminbereich; über die REST-Schnittstelle ist es nicht geladen.
+        $tmp = tempnam(get_temp_dir(), 'mct');
         $zip = new \ZipArchive();
-        $zip->open($tmp, \ZipArchive::OVERWRITE);
+        if ($tmp === false || $zip->open($tmp, \ZipArchive::OVERWRITE) !== true) {
+            throw new Fail('no_zip', 'Die Datei ließ sich nicht erstellen.', 500);
+        }
         if ($with_backup) {
             $zip->addFromString('backup.json', wp_json_encode(self::backup($uid)));
         }

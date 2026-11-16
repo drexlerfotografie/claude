@@ -1,0 +1,39 @@
+{
+  "name": "mediclever-tagebuch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "wp:start": "scripts/wp.sh start",
+    "wp:stop": "scripts/wp.sh stop",
+    "wp:reset": "scripts/wp.sh reset",
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "lint": "eslint app/src tests/e2e scripts --max-warnings 0",
+    "lint:php": "find plugin scripts tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null",
+    "typecheck": "tsc --noEmit",
+    "test:php": "vendor/bin/phpunit",
+    "test:e2e": "playwright test --trace off",
+    "screenshots": "playwright test --trace off --grep @screenshot",
+    "fixture": "php scripts/make-fixture.php",
+    "verify": "npm run lint && npm run lint:php && npm run typecheck && npm run build && scripts/wp.sh start > /dev/null && npm run test:php && npm run test:e2e",
+    "zip": "npm run build && mkdir -p dist && cd plugin && zip -qr ../dist/mediclever-tagebuch.zip mediclever-tagebuch"
+  },
+  "dependencies": {
+    "@fontsource/roboto": "^5.3.0",
+    "lucide": "^1.73.0",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@playwright/test": "^1.63.0",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.15.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8"
+  }
+}
