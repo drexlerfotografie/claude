@@ -11,3 +11,4 @@ app/google-services.json
 *.keystore
 keystore.properties
 node_modules/
+dist/
