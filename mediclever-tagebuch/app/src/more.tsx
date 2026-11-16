@@ -621,15 +621,22 @@ export function AccountScreen(): JSX.Element {
   const boot = useStore().boot!;
   const [word, setWord] = useState('');
   const [open, setOpen] = useState<'wipe' | 'delete' | null>(null);
+  const [data, setData] = useState(false);
+  const [account, setAccount] = useState(false);
   const consent = async (v: boolean) => {
     if (!v && !(await confirmDelete('Einwilligung widerrufen?', 'Ohne Einwilligung kannst du keine neuen Einträge speichern. Deine vorhandenen Einträge bleiben, bis du sie löschst.', 'Widerrufen'))) return;
     try { await post('/consent', { consent: v, adult: true }); await changed(); } catch (e) { fail(e); }
   };
+  const close = () => { setOpen(null); setWord(''); setData(false); setAccount(false); };
   const run = async () => {
     try {
       if (open === 'wipe') { await post('/account/wipe', { confirm: word }); toast('Dein Tagebuch ist leer.'); }
-      else { await del('/account', { confirm: word }); toast('Alle Tagebuchdaten wurden gelöscht.'); }
-      setOpen(null); setWord('');
+      else {
+        const r = await del<{ account_deleted: boolean }>('/account', { confirm: word, data, account });
+        if (r.account_deleted) { location.href = cfg.logout.split('/wp-login.php')[0] + '/'; return; }
+        toast('Alle Tagebuchdaten wurden gelöscht.');
+      }
+      close();
       await changed();
       go('/eintraege');
     } catch (e) { fail(e); }
@@ -646,19 +653,26 @@ export function AccountScreen(): JSX.Element {
         <Toggle label="Ich willige in die Verarbeitung meiner Tagebuchdaten ein" checked={!!boot.settings.consent_at} onChange={consent} />
         <p class="mct-muted small">Bitte trag keine Patienten- und Einsatzdaten ein. Nutzung ab 18 Jahren.</p>
       </Card>
-      <Card title="Daten löschen">
-        <p>Beides lässt sich nicht rückgängig machen. Sichere deine Daten vorher unter „Daten“.</p>
+      <Card title="Löschen">
+        <p>Nichts davon lässt sich rückgängig machen. Sichere deine Daten vorher unter „Daten“.</p>
         <div class="mct-btnrow wrap">
           <button type="button" class="mct-btn ghost danger" onClick={() => setOpen('wipe')}>Tagebuch leeren</button>
-          <button type="button" class="mct-btn ghost danger" onClick={() => setOpen('delete')}>Alle Tagebuchdaten löschen</button>
+          <button type="button" class="mct-btn ghost danger" onClick={() => setOpen('delete')}>Daten oder Konto löschen</button>
         </div>
       </Card>
-      {open && (
-        <Sheet title={open === 'wipe' ? 'Tagebuch leeren' : 'Alle Tagebuchdaten löschen'} onClose={() => { setOpen(null); setWord(''); }}
-          footer={<button type="button" class="mct-btn danger" disabled={word !== need} onClick={run}>Endgültig {open === 'wipe' ? 'leeren' : 'löschen'}</button>}>
-          <p>{open === 'wipe'
-            ? 'Alle Einträge, Fotos, Ziele, wichtigen Tage und deine Einrichtung werden gelöscht. Einstellungen und Einwilligung bleiben.'
-            : 'Alle Einträge, Fotos, Ziele, wichtigen Tage, die Einrichtung, KI-Freigaben, das Protokoll, Einstellungen und Einwilligungen werden gelöscht. Dein MediClever-Konto bleibt bestehen.'}</p>
+      {open === 'wipe' && (
+        <Sheet title="Tagebuch leeren" onClose={close} footer={<button type="button" class="mct-btn danger" disabled={word !== need} onClick={run}>Endgültig leeren</button>}>
+          <p>Alle Einträge, Fotos, Ziele, wichtigen Tage und deine Einrichtung werden gelöscht. Einstellungen und Einwilligung bleiben.</p>
+          <Field label={`Zur Bestätigung tippe ${need}`}><input type="text" value={word} autoComplete="off" onInput={(e) => setWord((e.target as HTMLInputElement).value.toUpperCase())} /></Field>
+        </Sheet>
+      )}
+      {open === 'delete' && (
+        <Sheet title="Daten oder Konto löschen" onClose={close} footer={<button type="button" class="mct-btn danger" disabled={word !== need || (!data && !account)} onClick={run}>Endgültig löschen</button>}>
+          <p>Wähle ausdrücklich aus, was gelöscht werden soll. In der Regel bleibt dein MediClever-Konto bestehen.</p>
+          <label class="mct-checkline"><input type="checkbox" checked={data} disabled={account} onChange={(e) => setData((e.target as HTMLInputElement).checked)} />
+            <span><strong>Alle Tagebuchdaten löschen</strong><br /><small>Einträge, Fotos, Ziele, wichtige Tage, Einrichtung, KI-Freigaben, Protokoll, Einstellungen und Einwilligungen.</small></span></label>
+          <label class="mct-checkline"><input type="checkbox" checked={account} onChange={(e) => { const v = (e.target as HTMLInputElement).checked; setAccount(v); if (v) setData(true); }} />
+            <span><strong>Auch mein MediClever-Konto löschen</strong><br /><small>Du verlierst damit den Zugang zur gesamten Lernzentrale. Das geht nur zusammen mit den Tagebuchdaten, weil sie sonst niemand mehr erreichen oder löschen könnte.</small></span></label>
           <Field label={`Zur Bestätigung tippe ${need}`}><input type="text" value={word} autoComplete="off" onInput={(e) => setWord((e.target as HTMLInputElement).value.toUpperCase())} /></Field>
         </Sheet>
       )}

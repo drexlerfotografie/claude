@@ -4,7 +4,7 @@ Stand: 16.11.2026, Ende der ersten Sitzung.
 
 ## Kurz
 
-Plugin, Web-App und MCP-Endpunkt sind gebaut und laufen lokal. `npm run verify` ist grün: 61 PHPUnit-Tests, 30 Playwright-Tests, Screenshots von 33 Bildschirmen in vier Varianten, axe ohne schwere Fehler. Eine unabhängige Gegenprüfung der Screenshots hat 34 Befunde geliefert; bis auf zwei geringe sind sie eingearbeitet (siehe `abnahme.md`, letzter Abschnitt). Eine zweite Prüfrunde steht aus.
+Plugin, Web-App und MCP-Endpunkt sind gebaut und laufen lokal. `npm run verify` ist grün: 62 PHPUnit-Tests, 30 Playwright-Tests, Screenshots von 33 Bildschirmen in vier Varianten, axe ohne schwere Fehler. Eine unabhängige Gegenprüfung der Screenshots hat 34 Befunde geliefert; bis auf zwei geringe sind sie eingearbeitet (siehe `abnahme.md`, letzter Abschnitt). Eine zweite Prüfrunde steht aus.
 
 **Fertig im Sinne der Projektbeschreibung ist das Projekt nicht.** Es fehlt die Abnahme gegen das Vorbild (Video) und gegen das echte Backup, weil beides in dieser Sitzung nicht vorlag. Dazu kommen Punkte, die nur auf dem Live-System oder am Handy prüfbar sind.
 
@@ -63,8 +63,8 @@ Zu den Annahmen der Projektbeschreibung (alle neun wurden so umgesetzt, wie sie 
 4. **Kostenlos oder Premium (Annahme 5):** Jede Funktion hat einen Schalter. Welche Teile sind Premium?
 5. **Schichtjournal (Annahme 6):** zusammenlegen oder trennen?
 6. **Live-System:** PHP- und WordPress-Version, Speicherplatz, Upload-Grenze, Apache oder nginx, echter Cron-Aufruf möglich? Kommt der `Authorization`-Kopf bei PHP an (manche Hoster entfernen ihn)? Werden Adressen unter `/.well-known/` an WordPress durchgereicht?
-7. **Konto löschen:** Soll auch das WordPress-Konto gelöscht werden oder nur das Tagebuch (jetzt: nur das Tagebuch)?
-8. **Stimmung löschen:** Einträge bekommen eine Ersatz-Stimmung, statt mitgelöscht zu werden. Einverstanden?
+7. **Konto löschen:** entschieden und umgesetzt (zwei Haken). Offen bleibt nur: Darf das Konto wirklich nie ohne die Daten gelöscht werden? Siehe Entscheidung 14.
+8. **Stimmung löschen:** entschieden und umgesetzt (Ersatz-Stimmung wählen und bestätigen).
 9. **Cleverle:** Es gibt keine Grafik im Material. Soll Cleverle in Leerzuständen erscheinen? Dann bitte eine Datei.
 10. **Name:** „MediClever Tagebuch“ ist Arbeitstitel.
 11. **Farbschemata der Stufen:** Die vier Schemata (Klar, Ruhig, Warm, Zurückhaltend) sind eigene Vorschläge; der Styleguide regelt keine Stimmungsfarben. Passt das zur Marke?
@@ -83,3 +83,13 @@ Nicht von Claude Code lösbar (stehen so in der Projektbeschreibung): Hosting-Fr
 - MySQL statt MariaDB, PHP 8.1 und 8.2, WordPress unter 7.1.
 - Export sehr großer Bestände (207 MB Fotos als ZIP) auf Webspace mit Zeitgrenze.
 - Lokal installiertes WordPress hat keine deutsche Sprachdatei; die Anmeldeseite ist deshalb englisch. Die App selbst ist deutsch.
+
+## Rückmeldung von Lukas am 16.11.2026
+
+- Import zuerst mit der CSV-Datei ausprobieren. MCP erst testen, wenn alles lokal läuft. Gerätetests macht Lukas nach der Installation. Live-System später.
+- Repository bleibt vorerst, wo es ist. Screenshots des Vorbilds fertigt Lukas an. Die neun Annahmen liest er noch.
+- Cleverle kommt noch dazu, Material folgt.
+- **Neu:** Bei der Android-App soll von Anfang an mitgedacht werden, dass App und Website synchron sind. Die REST-Schnittstelle ist dafür die Grundlage; was für eine App noch fehlt (Anmeldung ohne Browser-Cookie, Änderungen seit einem Zeitpunkt abrufen, Umgang mit gleichzeitigen Änderungen), ist nicht gebaut und braucht eine eigene Entscheidung.
+- Lukas klickt die App in der Vorschau durch und meldet, was ihm gefällt und was nicht. Die Rückmeldung wandert als neue Prüfpunkte in `abnahme.md`.
+
+Lokale Vorführung: `/?demo=anna` meldet das Testkonto ohne Passwort an (nur im Entwicklungs-Theme, nicht im Plugin).

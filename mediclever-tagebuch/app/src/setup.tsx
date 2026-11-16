@@ -43,6 +43,9 @@ async function removeWithCount(kind: 'tags' | 'scales' | 'groups', id: number, n
   toast(k === 'arch' ? 'Archiviert.' : 'Gelöscht.');
 }
 
+const confirmUnused = (name: string): Promise<boolean> => ask({ title: `„${name}“ löschen?`, text: 'Diese Stimmung wird in keinem Eintrag verwendet.',
+  buttons: [{ key: 'no', label: 'Abbrechen', kind: 'ghost' }, { key: 'yes', label: 'Löschen', kind: 'danger' }] }).then((k) => k === 'yes');
+
 const archive = (kind: string, id: number, archived: boolean) => post('/archive', { kind, id, archived }).then(changed).catch(fail);
 
 // ---- Stimmungen -----------------------------------------------------------
@@ -53,22 +56,50 @@ function MoodSheet({ mood, level, onClose }: { mood: Mood | null; level: number;
   const [icon, setIcon] = useState(mood?.icon || 'm' + level);
   const [lv, setLv] = useState(mood?.level || level);
   const save = async () => { try { await post(mood ? `/moods/${mood.id}` : '/moods', { name, icon, level: lv }); await changed(); onClose(); } catch (e) { fail(e); } };
+  const [replace, setReplace] = useState<{ count: number; id: number } | null>(null);
+  const others = boot.setup.moods.filter((m) => m.id !== mood?.id && !m.archived);
   const remove = async () => {
     if (!mood) return;
-    const { count } = await get<{ count: number }>('/usage', { kind: 'moods', id: mood.id });
-    const others = boot.setup.moods.filter((m) => m.id !== mood.id && !m.archived);
-    const same = others.find((m) => m.level === mood.level) || others[0];
-    const k = await ask({ title: `„${mood.name}“ löschen?`,
-      text: count > 0 ? `Diese Stimmung steckt in ${plural(count, 'Eintrag', 'Einträgen')}. Beim Löschen bekommen sie die Stimmung „${same?.name}“. Im Archiv bleibt alles, wie es ist.` : 'Diese Stimmung wird in keinem Eintrag verwendet.',
-      buttons: [{ key: 'no', label: 'Abbrechen', kind: 'ghost' }, ...(mood.archived ? [] : [{ key: 'arch', label: 'Archivieren', kind: 'primary' as const }]), { key: 'del', label: count > 0 ? `Löschen (${count})` : 'Löschen', kind: 'danger' }] });
     try {
-      if (k === 'arch') await post('/archive', { kind: 'moods', id: mood.id, archived: true });
-      else if (k === 'del') await del(`/moods/${mood.id}`, { replace_with: count > 0 ? same?.id : undefined });
-      else return;
+      const { count } = await get<{ count: number }>('/usage', { kind: 'moods', id: mood.id });
+      if (count > 0) {
+        // Einträge werden nie mitgelöscht: Der Nutzer wählt die Ersatz-Stimmung selbst und bestätigt sie.
+        setReplace({ count, id: (others.find((m) => m.level === mood.level) || others[0])?.id ?? 0 });
+        return;
+      }
+      if (!(await confirmUnused(mood.name))) return;
+      await del(`/moods/${mood.id}`);
       await changed();
       onClose();
     } catch (e) { fail(e); }
   };
+  const removeWith = async (archiveInstead: boolean) => {
+    if (!mood || !replace) return;
+    try {
+      if (archiveInstead) await post('/archive', { kind: 'moods', id: mood.id, archived: true });
+      else await del(`/moods/${mood.id}`, { replace_with: replace.id });
+      await changed();
+      toast(archiveInstead ? 'Archiviert.' : 'Gelöscht. Die Einträge haben jetzt die Ersatz-Stimmung.');
+      onClose();
+    } catch (e) { fail(e); }
+  };
+  if (mood && replace) {
+    const target = others.find((m) => m.id === replace.id);
+    return (
+      <Sheet title={`„${mood.name}“ löschen?`} onClose={() => setReplace(null)}
+        footer={<><button type="button" class="mct-btn ghost" onClick={() => setReplace(null)}>Abbrechen</button>
+          {!mood.archived && <button type="button" class="mct-btn ghost" onClick={() => removeWith(true)}>Archivieren</button>}
+          <button type="button" class="mct-btn danger" disabled={!target} onClick={() => removeWith(false)}>Löschen und ersetzen ({replace.count})</button></>}>
+        <p>Diese Stimmung steckt in {plural(replace.count, 'Eintrag', 'Einträgen')}. Die Einträge bleiben erhalten und bekommen eine Ersatz-Stimmung. Im Archiv bliebe alles, wie es ist.</p>
+        <Field label="Ersatz-Stimmung für diese Einträge">
+          <select value={replace.id} onChange={(e) => setReplace({ ...replace, id: Number((e.target as HTMLSelectElement).value) })}>
+            {others.map((m) => <option key={m.id} value={m.id}>{m.name} (Stufe {m.level} · {LEVEL_NAMES[m.level]})</option>)}
+          </select>
+        </Field>
+        {target && target.level !== mood.level && <div class="mct-hint warn">Die Ersatz-Stimmung liegt auf einer anderen Stufe. Das verändert deine Auswertungen rückwirkend.</div>}
+      </Sheet>
+    );
+  }
   return (
     <Sheet title={mood ? 'Stimmung bearbeiten' : 'Neue Stimmung'} onClose={onClose}
       footer={<>{mood && <button type="button" class="mct-btn ghost danger" onClick={remove}>Löschen</button>}

@@ -173,14 +173,33 @@ final class SetupEntriesTest extends Base
         $this->assertSame(200, $this->rest($u, 'GET', '/stats', ['month' => '2026-04'])->get_status());
     }
 
+    public function test_mediclever_konto_wird_nur_auf_ausdruecklichen_wunsch_geloescht(): void
+    {
+        $u = $this->user();
+        $this->entry($u, '2026-04-01', 2);
+        $res = $this->rest($u, 'DELETE', '/account', ['confirm' => 'LÖSCHEN', 'account' => 1]);
+        $this->assertSame(200, $res->get_status());
+        $this->assertTrue($res->get_data()['account_deleted']);
+        $this->assertFalse(get_userdata($u));
+        $this->assertSame(0, (int) MCT\Db::val('SELECT COUNT(*) FROM ' . MCT\Db::t('entries') . ' WHERE user_id = %d', [$u]), 'mit dem Konto gehen immer auch die Daten');
+        // Verwalter der Seite können ihr Konto hier nicht löschen.
+        $admin = $this->user();
+        (new WP_User($admin))->set_role('administrator');
+        $this->assertSame(403, $this->rest($admin, 'DELETE', '/account', ['confirm' => 'LÖSCHEN', 'account' => 1])->get_status());
+        $this->assertNotFalse(get_userdata($admin));
+    }
+
     public function test_konto_loeschen_entfernt_alles(): void
     {
         $u = $this->user();
         MCT\Setup::apply_pack($u, 'allgemein');
         $this->entry($u, '2026-04-01', 2);
         MCT\Goals::save($u, ['name' => 'Z']);
-        $this->assertSame(400, $this->rest($u, 'DELETE', '/account', ['confirm' => 'nein'])->get_status());
-        $this->assertSame(200, $this->rest($u, 'DELETE', '/account', ['confirm' => 'LÖSCHEN'])->get_status());
+        $this->assertSame(400, $this->rest($u, 'DELETE', '/account', ['confirm' => 'nein', 'data' => 1])->get_status());
+        $this->assertSame(400, $this->rest($u, 'DELETE', '/account', ['confirm' => 'LÖSCHEN'])->get_status(), 'ohne ausdrückliche Auswahl wird nichts gelöscht');
+        $this->assertSame(1, MCT\Import::counts($u)['entries']);
+        $this->assertSame(200, $this->rest($u, 'DELETE', '/account', ['confirm' => 'LÖSCHEN', 'data' => 1])->get_status());
+        $this->assertNotFalse(get_userdata($u), 'das MediClever-Konto bleibt in der Regel bestehen');
         foreach (MCT\Schema::TABLES as $t) {
             if ($t === 'oauth_clients') {
                 continue;

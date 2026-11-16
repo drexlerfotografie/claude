@@ -219,11 +219,19 @@ test.describe('Alltag mit Beispieldaten', () => {
     await expect(page.getByRole('button', { name: 'Zufrieden', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Stolz', exact: true }).click();
     await page.getByRole('button', { name: 'Löschen' }).click();
+    const before = (await rest<{ entries: number }>(page, 'GET', '/counts')).data.entries;
     const ask = page.getByRole('dialog', { name: '„Stolz“ löschen?' });
     await expect(ask).toContainText(/steckt in \d+ Einträgen/);
-    await expect(ask).toContainText('Sehr gut');
-    await ask.getByRole('button', { name: /Löschen \(\d+\)/ }).click();
+    await expect(ask).toContainText('Die Einträge bleiben erhalten');
+    // Die Ersatz-Stimmung wählt und bestätigt der Nutzer selbst; vorgeschlagen wird eine derselben Stufe.
+    const select = ask.getByLabel('Ersatz-Stimmung für diese Einträge');
+    await expect(select.locator('option:checked')).toContainText('Sehr gut');
+    await select.selectOption({ label: 'Gut (Stufe 2 · Gut)' });
+    await expect(ask).toContainText('anderen Stufe');
+    await select.selectOption({ label: 'Sehr gut (Stufe 1 · Sehr gut)' });
+    await ask.getByRole('button', { name: /Löschen und ersetzen \(\d+\)/ }).click();
     await expect(page.getByRole('button', { name: 'Stolz', exact: true })).toHaveCount(0);
+    expect((await rest<{ entries: number }>(page, 'GET', '/counts')).data.entries, 'kein Eintrag geht verloren').toBe(before);
   });
 
   test('Berichte, Rückblick, Fotos, Erfolge', async ({ page }) => {
@@ -333,6 +341,22 @@ test.describe('Alltag mit Beispieldaten', () => {
     await sheet.getByLabel('Zur Bestätigung tippe LEEREN').fill('leeren');
     await sheet.getByRole('button', { name: 'Endgültig leeren' }).click();
     await expect(page.getByRole('heading', { name: 'Noch kein Eintrag in diesem Monat' })).toBeVisible();
+
+    // Daten oder Konto löschen: nichts ist vorausgewählt, beides muss ausdrücklich angehakt werden.
+    await open(page, '/mehr/konto');
+    await page.getByRole('button', { name: 'Daten oder Konto löschen' }).click();
+    const del = page.getByRole('dialog', { name: 'Daten oder Konto löschen' });
+    const data = del.getByRole('checkbox', { name: /Alle Tagebuchdaten löschen/ });
+    const account = del.getByRole('checkbox', { name: /Auch mein MediClever-Konto löschen/ });
+    await expect(data).not.toBeChecked();
+    await expect(account).not.toBeChecked();
+    await del.getByLabel('Zur Bestätigung tippe LÖSCHEN').fill('löschen');
+    await expect(del.getByRole('button', { name: 'Endgültig löschen' })).toBeDisabled();
+    await account.check();
+    await expect(data, 'das Konto geht nur zusammen mit den Daten').toBeChecked();
+    await account.uncheck();
+    await expect(del.getByRole('button', { name: 'Endgültig löschen' })).toBeEnabled();
+    await del.getByRole('button', { name: 'Schließen' }).click();
     expect((await rest<{ entries: number; assets: number }>(page, 'GET', '/counts')).data).toMatchObject({ entries: 0, assets: 0, tags: 0 });
   });
 });

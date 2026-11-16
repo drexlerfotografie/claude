@@ -142,7 +142,7 @@ Alle Zahlen rechnet der Server. Jede Auswertung ist gegen eine von Hand nachgere
 | --- | --- | --- | --- |
 | H1 | Jede Tabelle trägt eine Nutzer-ID, Präfix `mct_` | erfüllt | `includes/schema.php` |
 | H2 | Fremde IDs gezielt angefragt: 24 Zugriffe, alle abgewiesen | erfüllt | P: IsolationTest |
-| H3 | Archivieren ist ein Zeitstempel; Löschen entfernt abhängige Zeilen und Dateien | erfüllt, bei Stimmungen bewusst abweichend | P; Entscheidung 13 |
+| H3 | Archivieren ist ein Zeitstempel; Löschen entfernt abhängige Zeilen und Dateien | erfüllt; bei Stimmungen bewusst abweichend, von Lukas bestätigt | P, E: 02 „Stimmungen“; Entscheidung 13 |
 | H4 | Notizen durch Positivliste | erfüllt | P „positivliste“ |
 | H5 | Lokales Datum gespeichert und indiziert | erfüllt | Schema, P |
 | H6 | Jede Funktion hängt an einem Schalter | erfüllt | P „funktionsschalter“ |
@@ -188,7 +188,7 @@ Alle Zahlen rechnet der Server. Jede Auswertung ist gegen eine von Hand nachgere
 | --- | --- | --- | --- |
 | K1 | Einwilligung vor dem ersten Eintrag, getrennte Einwilligung für KI, beide widerrufbar | erfüllt | P, E: 01, 02, 04 |
 | K2 | Text zur KI-Freigabe nennt die Weitergabe an den Anbieter | erfüllt | E: 04 |
-| K3 | Vollständiger Export und vollständige Löschung samt Fotos | erfüllt, „Konto“ bewusst abweichend | P; Entscheidung 14 |
+| K3 | Vollständiger Export und vollständige Löschung samt Fotos; Daten und MediClever-Konto getrennt wählbar | erfüllt nach Vorgabe von Lukas | P, E: 02 „Konto“; Entscheidung 14 |
 | K4 | Fotos nie öffentlich abrufbar; Aufnahmeort und Gerätedaten entfernt | erfüllt | P: IsolationTest |
 | K5 | Keine Inhalte in Logs, Fehlermeldungen, Statistik | erfüllt | P „protokoll“ |
 | K6 | Hinweis: keine Patienten- und Einsatzdaten | erfüllt | Erster Start, Mehr, Konto |

@@ -31,6 +31,22 @@ final class Account
     }
 }
 
+/** Löscht auf Wunsch auch das MediClever-Konto selbst. Nie ohne die Tagebuchdaten, nie für Verwalter der Seite. */
+final class AccountRemoval
+{
+    public static function run(int $uid): void
+    {
+        if (user_can($uid, 'manage_options') || user_can($uid, 'edit_others_posts') || !apply_filters('mct_allow_account_delete', true, $uid)) {
+            throw new Fail('account_protected', 'Dieses Konto lässt sich hier nicht löschen. Bitte wende dich an MediClever.', 403);
+        }
+        Account::delete_all($uid);
+        require_once ABSPATH . 'wp-admin/includes/user.php';
+        if (!wp_delete_user($uid)) {
+            throw new Fail('account_delete', 'Das Konto ließ sich nicht löschen.', 500);
+        }
+    }
+}
+
 /** Export: CSV, PDF, eigenes Sicherungsformat, Fotos. */
 final class Export
 {

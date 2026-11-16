@@ -286,7 +286,19 @@ final class Rest
             if (($r['confirm'] ?? '') !== 'LÖSCHEN') {
                 throw new Fail('confirm', 'Bitte bestätige die Löschung mit dem Wort LÖSCHEN.');
             }
+            $data = !empty($r['data']);
+            $account = !empty($r['account']);
+            if (!$data && !$account) {
+                throw new Fail('nothing_chosen', 'Bitte wähle aus, was gelöscht werden soll.');
+            }
+            if ($account) {
+                // Ohne Konto wären die Daten für niemanden mehr erreichbar: Das Konto geht nur zusammen mit den Tagebuchdaten.
+                AccountRemoval::run($u);
+                wp_logout();
+                return ['ok' => true, 'account_deleted' => true];
+            }
             Account::delete_all($u);
+            return ['ok' => true, 'account_deleted' => false];
         });
 
         // KI-Freigaben und Protokoll

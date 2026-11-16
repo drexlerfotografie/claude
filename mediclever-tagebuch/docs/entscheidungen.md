@@ -69,13 +69,17 @@ Web-Push nach RFC 8291 und 8292 mit OpenSSL, ohne Bibliothek. Ver- und Entschlü
 
 Die PIN wird nur im Browser gespeichert (gesalzener SHA-256-Hash im lokalen Speicher) und sperrt die Oberfläche auf diesem Gerät. Sie ist kein Schutz gegen jemanden mit Zugriff auf das Konto oder die Entwicklerwerkzeuge des Browsers und ersetzt nicht die Anmeldung.
 
-## 13. Löschen von Stimmungen
+## 13. Löschen von Stimmungen (von Lukas am 16.11.2026 bestätigt)
 
-Abweichend von „echte Löschung entfernt abhängige Zeilen“ löscht das Entfernen einer Stimmung keine Einträge. Der Dialog nennt die Zahl der betroffenen Einträge; sie bekommen eine Ersatz-Stimmung derselben Stufe. Sonst würde ein Tippfehler in der Einrichtung Tagebucheinträge vernichten.
+Das Entfernen einer Stimmung löscht keine Einträge. Der Dialog nennt die Zahl der betroffenen Einträge; der Nutzer wählt die Ersatz-Stimmung selbst und bestätigt sie. Vorgeschlagen wird eine Stimmung derselben Stufe; bei einer anderen Stufe warnt der Dialog, dass sich Auswertungen rückwirkend ändern.
 
-## 14. „Konto löschen“
+## 14. Daten oder Konto löschen (von Lukas am 16.11.2026 festgelegt)
 
-Gelöscht werden alle Tagebuchdaten, Fotos, Freigaben, Protokoll, Einstellungen und Einwilligungen. Das MediClever-Konto (WordPress-Nutzer) bleibt, weil daran die übrigen Lernzentrale-Tools hängen. Ob auch der WordPress-Nutzer gelöscht werden soll, ist eine offene Frage an Lukas.
+Ein Dialog mit zwei Haken, keiner ist vorausgewählt: „Alle Tagebuchdaten löschen“ und „Auch mein MediClever-Konto löschen“. In der Regel bleibt das Konto bestehen.
+
+Abweichung von der wörtlichen Vorgabe, bitte prüfen: Das Konto lässt sich nur zusammen mit den Tagebuchdaten löschen. Blieben die Daten ohne Konto zurück, könnte niemand mehr auf sie zugreifen oder sie löschen; bei Gesundheitsdaten halte ich das für nicht vertretbar. Verwalter der Seite können ihr Konto hier nicht löschen. Über den Filter `mct_allow_account_delete` lässt sich die Kontolöschung ganz abschalten.
+
+Offen: Wenn am Konto Bestellungen aus dem Shop hängen, können Aufbewahrungspflichten gegen das sofortige Löschen des WordPress-Nutzers sprechen. Das gehört in die rechtliche Prüfung.
 
 ## 15. Auswertungen: Rechenregeln
 
