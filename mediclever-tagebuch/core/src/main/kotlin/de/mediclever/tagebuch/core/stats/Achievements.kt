@@ -43,7 +43,7 @@ private class Def(val category: AchievementCategory, val target: Int, val title:
 private val CATALOGUE: List<Def> = buildList {
     fun add(c: AchievementCategory, target: Int, title: String, description: String) = add(Def(c, target, title, description))
     val e = AchievementCategory.ENTRIES
-    add(e, 1, "Anfang gemacht", "Du hast Deinen ersten Eintrag geschrieben.")
+    add(e, 1, "Anfang gemacht", "Du hast deinen ersten Eintrag geschrieben.")
     add(e, 10, "Zehn Seiten", "Du hast 10 Einträge geschrieben.")
     add(e, 50, "Fünfzig Seiten", "Du hast 50 Einträge geschrieben.")
     add(e, 100, "Hundert Seiten", "Du hast 100 Einträge geschrieben.")
@@ -61,11 +61,11 @@ private val CATALOGUE: List<Def> = buildList {
     add(s, 365, "Ein Jahr ohne Lücke", "Du hast an 365 Tagen in Folge etwas eingetragen.")
     val g = AchievementCategory.GOALS
     add(g, 1, "Erstes Häkchen", "Du hast zum ersten Mal ein Ziel abgehakt.")
-    add(g, 10, "Zehn Häkchen", "Du hast Deine Ziele 10-mal abgehakt.")
-    add(g, 50, "Fünfzig Häkchen", "Du hast Deine Ziele 50-mal abgehakt.")
-    add(g, 100, "Hundert Häkchen", "Du hast Deine Ziele 100-mal abgehakt.")
-    add(g, 500, "Fünfhundert Häkchen", "Du hast Deine Ziele 500-mal abgehakt.")
-    add(g, 1000, "Tausend Häkchen", "Du hast Deine Ziele 1000-mal abgehakt.")
+    add(g, 10, "Zehn Häkchen", "Du hast deine Ziele 10-mal abgehakt.")
+    add(g, 50, "Fünfzig Häkchen", "Du hast deine Ziele 50-mal abgehakt.")
+    add(g, 100, "Hundert Häkchen", "Du hast deine Ziele 100-mal abgehakt.")
+    add(g, 500, "Fünfhundert Häkchen", "Du hast deine Ziele 500-mal abgehakt.")
+    add(g, 1000, "Tausend Häkchen", "Du hast deine Ziele 1000-mal abgehakt.")
     val y = AchievementCategory.YEARS
     add(y, 1, "Ein Jahr Tagebuch", "Dein erster Eintrag liegt 1 Jahr zurück.")
     val words = listOf("Zwei", "Drei", "Vier", "Fünf", "Sechs", "Sieben", "Acht", "Neun", "Zehn")

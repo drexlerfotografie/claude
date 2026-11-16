@@ -699,7 +699,7 @@ internal fun insightLines(
     if (entryCount == 0) return emptyList()
     val lines = ArrayList<String>()
     val daysPart = if (dayCount == 1) "1 Tag" else "$dayCount Tagen"
-    lines += "$periodLabel hast Du ${entriesText(entryCount)} an $daysPart geschrieben."
+    lines += "$periodLabel hast du ${entriesText(entryCount)} an $daysPart geschrieben."
     if (previousEntryCount > 0) {
         val diff = entryCount - previousEntryCount
         val n = Math.abs(diff)

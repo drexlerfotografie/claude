@@ -207,7 +207,7 @@ class PeriodStatsTest {
     @Test fun insightsAreCalmGermanSentences() {
         assertEquals(
             listOf(
-                "Im März 2026 hast Du 8 Einträge an 7 Tagen geschrieben.",
+                "Im März 2026 hast du 8 Einträge an 7 Tagen geschrieben.",
                 "Das sind 6 Einträge mehr als im Vormonat.",
                 "Deine durchschnittliche Stimmung lag bei 3,5 von 5 und damit um 0,5 höher als im Vormonat.",
                 "Dein bester Wochentag war der Samstag mit durchschnittlich 5,0 von 5.",
@@ -224,7 +224,7 @@ class PeriodStatsTest {
         // Fr 27.02. (2 Punkte) [Arbeit], Sa 28.02. (4) [Sport]; im Januar nichts.
         assertEquals(
             listOf(
-                "Im Februar 2026 hast Du 2 Einträge an 2 Tagen geschrieben.",
+                "Im Februar 2026 hast du 2 Einträge an 2 Tagen geschrieben.",
                 "Deine durchschnittliche Stimmung lag bei 3,0 von 5.",
                 "Dein bester Wochentag war der Samstag mit durchschnittlich 4,0 von 5.",
                 "Deine häufigste Aktivität war „Arbeit“ in 1 Eintrag.",
@@ -284,7 +284,7 @@ class PeriodStatsTest {
         assertEquals(430.0, schlaf.average)
         assertNull(schlaf.change)
         assertEquals(ChangeRating.NEUTRAL, schlaf.changeRating)
-        assertEquals("Im Jahr 2026 hast Du 10 Einträge an 9 Tagen geschrieben.", s.insights.first())
+        assertEquals("Im Jahr 2026 hast du 10 Einträge an 9 Tagen geschrieben.", s.insights.first())
         // Sport: mit (4+5+4+5+4)/5 = 4,4; ohne (2+4+2+1+3)/5 = 2,4
         assertEquals(2.0, s.activityInfluence.first().delta, 1e-9)
         assertEquals(4, s.streak.longest)
