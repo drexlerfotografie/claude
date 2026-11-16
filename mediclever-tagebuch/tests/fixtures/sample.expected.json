@@ -1,0 +1,28 @@
+{
+    "entries": 453,
+    "levels": {
+        "1": 90,
+        "2": 132,
+        "3": 149,
+        "4": 45,
+        "5": 37
+    },
+    "with_note": 125,
+    "with_title": 1,
+    "favorites": 17,
+    "assets": 16,
+    "asset_links": 14,
+    "moods": 6,
+    "tags": 13,
+    "tags_archived": 2,
+    "groups": 3,
+    "scales": 3,
+    "goals": 3,
+    "goals_archived": 1,
+    "goal_checks": 102,
+    "milestones": 3,
+    "templates": 2,
+    "reminders": 2,
+    "first_entry": "2025-10-01",
+    "last_entry": "2026-11-16"
+}

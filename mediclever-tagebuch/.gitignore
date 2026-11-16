@@ -1,0 +1,13 @@
+# Private Daten und Referenzmaterial: nie einchecken
+/reference/
+/private/
+# Lokale Umgebung und Abhängigkeiten
+/.wp/
+/node_modules/
+/vendor/
+/plugin/mediclever-tagebuch/build/
+/test-results/
+/playwright-report/
+/dist/
+*.log
+.DS_Store
