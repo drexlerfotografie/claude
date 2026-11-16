@@ -76,10 +76,14 @@ enum class MoodScheme(val key: String, val label: String, val colors: List<Color
     }
 }
 
-/** Zwoelf Farben fuer Gruppen, Skalen und Ziele. */
+/**
+ * Farben fuer Gruppen, Aktivitaeten, Skalen und Ziele. Der Index steht in den Daten: Farben nur
+ * hinten anfuegen, nie umsortieren. Die Liste muss zu PALETTE_HEX im Daylio-Import passen.
+ */
 val GroupPalette: List<Color> = listOf(
     0xFFB9303F, 0xFFDD7F37, 0xFFD9A62E, 0xFF78A94E, 0xFF2D8A5F, 0xFF1F7A8C,
     0xFF4F7FC0, 0xFF6A4C93, 0xFFB05690, 0xFF8A6E52, 0xFF5C6B78, 0xFF2D323C,
+    0xFF7DBE2B, 0xFF19B5B0, 0xFFE0558A, 0xFFA07BE0, 0xFF2F7BD9, 0xFFF2C230,
 ).map { Color(it) }
 
 fun rawGroupColor(index: Int?): Color = GroupPalette[((index ?: 10) % GroupPalette.size + GroupPalette.size) % GroupPalette.size]

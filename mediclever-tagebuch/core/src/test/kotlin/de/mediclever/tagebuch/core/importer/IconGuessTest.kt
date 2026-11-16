@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 class IconGuessTest {
 
     @Test fun onlyCatalogIconsAreUsed() {
-        assertEquals(106, IconGuess.ALLOWED.size)
+        // Dass ALLOWED genau dem Katalog der App entspricht, prueft IconCatalogTest in :app.
         val foreign = IconGuess.usedIcons() - IconGuess.ALLOWED
         assertTrue(foreign.isEmpty(), "nicht im Katalog: $foreign")
     }
@@ -25,6 +25,15 @@ class IconGuessTest {
             "Hund" to "pets", "Garten" to "yard", "Wäsche" to "local_laundry_service", "Party" to "celebration",
             "Date" to "favorite", "work" to "work", "friends" to "group", "family" to "family_restroom",
             "Alkohol" to "local_bar", "Wandern" to "hiking", "Lernen" to "school", "Therapie" to "psychology",
+        )
+        for ((name, icon) in cases) assertEquals(icon, IconGuess.guess(name), name)
+    }
+
+    @Test fun moreSpecificWordsWinOverGeneralOnes() {
+        val cases = mapOf(
+            "Gottesdienst" to "church", "Sodbrennen" to "flash_on", "Kein Fastfood" to "no_food", "Blutdruck" to "monitor_heart",
+            "Arzttermin" to "medical_services", "Aufregend" to "circle", "Aufgeregt" to "waves", "Frei" to "weekend", "Freitag" to "circle",
+            "Vor 2:00 Uhr" to "access_time", "Traurig" to "sentiment_dissatisfied", "Wolkig" to "wb_cloudy", "Schwindel" to "grain",
         )
         for ((name, icon) in cases) assertEquals(icon, IconGuess.guess(name), name)
     }

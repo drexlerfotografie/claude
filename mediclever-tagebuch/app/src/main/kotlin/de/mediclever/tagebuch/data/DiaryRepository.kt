@@ -190,6 +190,16 @@ class DiaryRepository(
         }
     }
 
+    /**
+     * Leert das Tagebuch, behaelt aber Einwilligung, PIN und Konto. Alle Zeilen bekommen eine
+     * Loeschmarke, damit die Loeschung beim Abgleich auch andere Geraete erreicht.
+     */
+    suspend fun clearDiary() {
+        val d = snapshot()
+        d.assets.forEach { assets.delete(it) }
+        markDeleted(d.moods + d.groups + d.tags + d.scales + d.entries + d.assets + d.goals + d.goalChecks + d.importantDays + d.templates + d.reminders)
+    }
+
     /** Alles auf dem Geraet loeschen (Konto loeschen, Zuruecksetzen). */
     suspend fun wipeLocal() {
         Table.entries.forEach { dao(it).wipe() }

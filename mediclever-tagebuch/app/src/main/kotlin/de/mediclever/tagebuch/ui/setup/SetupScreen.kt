@@ -230,6 +230,7 @@ private fun GroupPage(id: String, onBack: () -> Unit) {
     val reorder = rememberReorderableLazyListState(lazy) { from, to -> list = list.toMutableList().apply { add(to.index, removeAt(from.index)) } }
     fun persist(rows: List<Tag>) = env.act { save(rows.mapIndexed { i, t -> t.copy(sortOrder = i) }) }
     var editing by remember { mutableStateOf<Tag?>(null) }
+    var fetch by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val color = groupColor(group?.colorIndex)
@@ -247,7 +248,10 @@ private fun GroupPage(id: String, onBack: () -> Unit) {
             if (group.archivedAt == null) TextButton({ env.act { save(group.copy(archivedAt = System.currentTimeMillis())) }; onBack() }) { Text("Gruppe archivieren") }
             else TextButton({ env.act { save(group.copy(archivedAt = null)) } }) { Text("Gruppe wiederherstellen") }
         }
-        Button({ editing = Tag(groupId = gid, name = "", sortOrder = list.size) }, Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Aktivität hinzufügen") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button({ editing = Tag(groupId = gid, name = "", sortOrder = list.size) }, Modifier.weight(1f)) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Neue Aktivität") }
+            OutlinedButton({ fetch = true }, Modifier.weight(1f), enabled = d.tags.any { it.groupId != gid && it.archivedAt == null }) { Icon(Icons.Rounded.MoveDown, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Hierher holen") }
+        }
         LazyColumn(Modifier.weight(1f), state = lazy, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
             items(list, key = { it.id }) { t ->
                 ReorderableItem(reorder, key = t.id) { _ ->
@@ -271,6 +275,27 @@ private fun GroupPage(id: String, onBack: () -> Unit) {
         }
     }
     editing?.let { t -> TagDialog(t, isNew = d.tags.none { it.id == t.id }, groupColor = color) { editing = null } }
+    if (fetch) {
+        val chosen = remember { mutableStateListOf<String>() }
+        val others = d.tags.filter { it.groupId != gid && it.archivedAt == null }
+        AlertDialog(onDismissRequest = { fetch = false }, title = { Text("Aktivitäten nach „${group?.name ?: "Ohne Gruppe"}“ holen") },
+            text = {
+                Column(Modifier.verticalScrollCompat()) {
+                    Text("Wähle alle Aktivitäten, die in diese Gruppe gehören sollen. Ihre Einträge bleiben unverändert.", style = MaterialTheme.typography.bodyMedium)
+                    for ((gname, tags) in others.groupBy { d.groupById[it.groupId]?.name ?: "Ohne Gruppe" }) {
+                        SectionLabel(gname)
+                        for (t in tags) Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(role = Role.Checkbox) { if (t.id in chosen) chosen.remove(t.id) else chosen.add(t.id) }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Checkbox(t.id in chosen, null); Icon(iconFor(t.icon), null, Modifier.size(20.dp)); Text(t.name)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton({
+                val moved = others.filter { it.id in chosen }.mapIndexed { i, t -> t.copy(groupId = gid, sortOrder = list.size + i) }
+                env.act { save(moved) }; fetch = false
+            }, enabled = chosen.isNotEmpty()) { Text(if (chosen.isEmpty()) "Verschieben" else "${chosen.size} verschieben") } },
+            dismissButton = { TextButton({ fetch = false }) { Text("Abbrechen") } })
+    }
     if (rename && group != null) TextPromptDialog("Gruppe umbenennen", "Name (Emoji erlaubt)", group.name, onDismiss = { rename = false }, onConfirm = { env.act { save(group.copy(name = it)) }; rename = false })
     if (confirmDelete && group != null) {
         val n = d.tags.count { it.groupId == group.id }

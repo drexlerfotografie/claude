@@ -112,6 +112,34 @@ class DataOpsTest {
         for ((_, rows) in remote.maps) for (m in rows) assertTrue(m.values.all { it == null || it is Long || it is Boolean || it is String || it is List<*> || it is Map<*, *> })
     }
 
+    /** Ein frueherer CSV-Import wird durch das vollstaendige Backup ersetzt, ohne Reste und ohne Doppelte. */
+    @Test fun replaceImportClearsEarlierCsvImport() = runBlocking {
+        val csv = File(app.cacheDir, "alt.csv")
+        csv.writeText("full_date,date,weekday,time,mood,activities,scales,note_title,note\n2026-01-02,2. Januar,Freitag,20:00,Prima,Lesen | Kochen,,,\n2026-01-03,3. Januar,Samstag,20:00,Naja,Lesen,,,\n")
+        val opened = open(csv) as Opened.Csv
+        assertEquals(listOf("Prima", "Naja"), opened.import.unknownMoods)
+        c.dataOps.importCsv(opened, mapOf("Prima" to 1, "Naja" to 4))
+        val afterCsv = c.repo.snapshot()
+        assertEquals("die gewaehlte Stufe gilt, nicht die geratene", mapOf("Prima" to 1, "Naja" to 4), afterCsv.moods.associate { it.name to it.level })
+        assertEquals(2, afterCsv.entries.size)
+
+        val want = (open(fixture) as Opened.Archive).result.preview
+        c.dataOps.importArchive(open(fixture) as Opened.Archive, MergeMode.EMPTY_ONLY, replace = true) { _, _ -> }
+        assertEquals(want, preview())
+        assertTrue(c.repo.snapshot().moods.none { it.name == "Prima" })
+    }
+
+    /** Auch die einzelne Datei backup.daylio (ohne ZIP und ohne Fotos) laesst sich importieren. */
+    @Test fun bareBackupFileImportsWithoutPhotos() = runBlocking {
+        val bare = File(app.cacheDir, "backup.daylio")
+        java.util.zip.ZipFile(fixture).use { z -> bare.writeBytes(z.getInputStream(z.entries().asSequence().first { it.name.endsWith("backup.daylio") }).readBytes()) }
+        val opened = open(bare) as Opened.Archive
+        assertTrue(opened.result.assetFiles.isEmpty())
+        val out = c.dataOps.importArchive(opened, MergeMode.EMPTY_ONLY) { _, _ -> }
+        assertEquals(0, out.filesCopied); assertEquals(0, out.report.errors)
+        assertEquals(120, preview().entries)
+    }
+
     @Test fun remindersArePlannedForActiveItemsOnly() {
         val now = LocalDateTime.of(2026, 11, 16, 12, 0)
         val plan = Plan.upcoming(SampleData.diary, now)

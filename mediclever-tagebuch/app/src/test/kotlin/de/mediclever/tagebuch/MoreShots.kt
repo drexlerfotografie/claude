@@ -39,3 +39,10 @@ class MoreShots : ShotBase() {
     @Test fun about() = shot("ueber") { AboutScreen() }
     @Test fun search() = shot("suche") { SearchScreen() }
 }
+
+@RunWith(RobolectricTestRunner::class)
+class DialogShots : ShotBase() {
+    @Test fun colorPicker() = shot("farbauswahl") {
+        de.mediclever.tagebuch.ui.Panel(title = "Farbe") { de.mediclever.tagebuch.ui.ColorPicker(12, {}) }
+    }
+}

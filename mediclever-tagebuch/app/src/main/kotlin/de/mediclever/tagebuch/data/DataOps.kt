@@ -133,7 +133,16 @@ class DataOps(private val context: Context, private val repo: DiaryRepository) {
         val file = File(File(context.cacheDir, "import").apply { deleteRecursively(); mkdirs() }, "datei")
         context.contentResolver.openInputStream(source)?.use { input -> file.outputStream().use { input.copyTo(it) } } ?: throw ImportException("Die Datei konnte nicht geöffnet werden.")
         val isZip = file.inputStream().use { s -> val b = ByteArray(2); s.read(b) == 2 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte() }
-        if (!isZip) return@withContext Opened.Csv(file, CsvFormat.parse(file.readText(), live(repo.snapshot())))
+        if (!isZip) {
+            // Auch die einzelne Datei "backup.daylio" aus dem Archiv wird angenommen (Base64 oder JSON), dann ohne Fotos
+            val head = file.inputStream().use { s -> ByteArray(64).let { b -> String(b, 0, s.read(b).coerceAtLeast(0)) } }.trimStart()
+            val looksLikeCsv = head.contains(',') || head.contains(';')
+            if (!looksLikeCsv || head.startsWith("{")) {
+                val result = runCatching { DaylioBackup.fromJson(DaylioBackup.decodeBackupText(file.readBytes())) }.getOrNull()
+                if (result != null && result.preview.entries + result.preview.moods > 0) return@withContext Opened.Archive(file, "Backup im Daylio-Format (nur Daten, ohne Fotos)", result.copy(assetFiles = emptyList()))
+            }
+            return@withContext Opened.Csv(file, CsvFormat.parse(file.readText(), live(repo.snapshot())))
+        }
         val names = runCatching { ZipFile(file).use { z -> z.entries().asSequence().map { it.name.trimStart('/') }.toList() } }.getOrElse { throw ImportException("Die Datei ist beschädigt oder kein gültiges Archiv.") }
         when {
             BackupFormat.JSON_NAME in names -> Opened.Archive(file, "Sicherung von MediClever Tagebuch", BackupFormat.read(file))
@@ -152,21 +161,27 @@ class DataOps(private val context: Context, private val repo: DiaryRepository) {
         File(File(context.cacheDir, "share").apply { mkdirs() }, "strukturbericht.txt").apply { writeText(text) }
     }
 
-    suspend fun importArchive(opened: Opened.Archive, mode: MergeMode, onProgress: (Int, Int) -> Unit): ImportOutcome = withContext(Dispatchers.IO) {
+    /**
+     * replace = true leert das Tagebuch vorher. Das ist der Weg, um einen frueheren, fehlerhaften
+     * Import (z. B. aus einer CSV-Datei) durch das vollstaendige Backup zu ersetzen.
+     */
+    suspend fun importArchive(opened: Opened.Archive, mode: MergeMode, replace: Boolean = false, onProgress: (Int, Int) -> Unit): ImportOutcome = withContext(Dispatchers.IO) {
+        if (replace) repo.clearDiary()
         val existing = repo.snapshot()
         val merged = DiaryMerge.merge(existing, opened.result.diary, mode)
         saveChanged(existing, merged.diary, withSettings = mode == MergeMode.EMPTY_ONLY)
         // Nur Dateien kopieren, deren Datensatz uebernommen wurde und die noch fehlen
         val wanted = merged.diary.assets.filter { !it.deleted }.associateBy { it.id }
         val todo = opened.result.assetFiles.filter { f -> wanted[f.assetId]?.let { !repo.assets.exists(it) } == true }
-        val copy = ImportArchive.copyAssets(opened.file, todo, repo.assets.file(Asset(fileName = "x")).parentFile!!, onProgress)
+        val copy = if (todo.isEmpty()) CopyReport(0, 0) else ImportArchive.copyAssets(opened.file, todo, repo.assets.file(Asset(fileName = "x")).parentFile!!, onProgress)
         opened.file.delete()
         ImportOutcome(merged.report, copy.copied, copy.failed)
     }
 
-    suspend fun importCsv(opened: Opened.Csv): ImportOutcome = withContext(Dispatchers.IO) {
+    /** moodLevels: Stufe 1 bis 5 je unbekannter Stimmung, vom Nutzer bestaetigt. */
+    suspend fun importCsv(opened: Opened.Csv, moodLevels: Map<String, Int> = emptyMap()): ImportOutcome = withContext(Dispatchers.IO) {
         val existing = repo.snapshot()
-        val incoming = CsvFormat.resolve(opened.import, live(existing))
+        val incoming = CsvFormat.resolve(opened.import, live(existing), moodLevels)
         val merged = DiaryMerge.merge(existing, incoming, MergeMode.MERGE)
         saveChanged(existing, merged.diary, withSettings = false)
         opened.file.delete()

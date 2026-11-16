@@ -1,6 +1,8 @@
 # Stand
 
-**16.11.2026:** Erste vollständige Fassung der Android-App. Sie baut, alle Tests sind grün, die App lief bisher nur in der Testumgebung, noch auf keinem echten Gerät.
+**16.11.2026, abends:** Version 0.2.0. Der Daylio-Import ist gegen das echte Backup geprüft und korrigiert (Skalenpunkte, Farben, Stimmungsfarben, Wochentags-Ziele). Ursache der falschen Stufen auf dem Handy war ein CSV-Import, bei dem die App die Stufe geraten hat; jetzt fragt sie. Neu: Tagebuch beim Import ersetzen, einzelne Datei `backup.daylio`, 386 Symbole in Themenpaketen, 18 Farben, mehrere Aktivitäten auf einmal in eine Gruppe holen.
+
+**16.11.2026, erste Fassung:** Erste vollständige Fassung der Android-App. Sie baut, alle Tests sind grün, die App lief bisher nur in der Testumgebung, noch auf keinem echten Gerät.
 
 ## Was es gibt
 - Komplette App nach Projektbeschreibung, Abschnitte Funktionsumfang und Selbst einrichten (Einzelheiten und Belege in `abnahme.md`)
@@ -22,7 +24,8 @@
 - Erfolge: reichen Symbole je Kategorie oder sollen eigene Abzeichen gezeichnet werden?
 
 ## Bekannte Grenzen
-- Feldnamen für Skalen und wichtige Tage im Daylio-Backup sind geraten (im Code mit `ANNAHME` markiert).
+- Im Daylio-Backup unbekannt: Bedeutung der Erinnerungs- und Kategorienummern wichtiger Tage sowie einzelne Farbnummern (im Code mit `ANNAHME` markiert).
+- Symbole der Aktivitäten lassen sich nicht übernehmen; die App wählt anhand des Namens ein eigenes.
 - Ein Ziel mit verknüpfter Aktivität lässt sich an einem Tag nicht abwählen, solange ein Eintrag die Aktivität enthält.
 - Monatliche Ziele aus dem Import werden zu „einmal pro Woche“.
 - Erinnerungen können wenige Minuten später kommen (kein Sonderrecht für exakte Wecker).

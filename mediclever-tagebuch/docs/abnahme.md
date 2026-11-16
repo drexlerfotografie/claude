@@ -39,7 +39,8 @@ Belege: `AppFlowTest` und `DataOpsTest` laufen durch die echte App mit echter Da
 | Berichte Woche und Monat mit Veränderung | erfüllt | ReportsTest, berichte |
 | Rückblick, Wichtige Tage, Favoriten, Fotos, Erfolge | erfüllt | Screenshots, EntryListTest, AchievementsTest |
 | Erfolge mit eigenen Grafiken | abweichend | eigene Namen, aber nur Symbol je Kategorie statt eigener Abzeichen |
-| Einrichtung: Stimmungen, Gruppen, Aktivitäten (umbenennen, verschieben, archivieren, ersetzen, löschen), Skalen, Vorlagen, Sortieren per Ziehen | erfüllt, Ziehen: Gerät | einrichtung_* |
+| Einrichtung: Stimmungen, Gruppen, Aktivitäten (umbenennen, verschieben, mehrere auf einmal in eine Gruppe holen, archivieren, ersetzen, löschen), Skalen, Vorlagen, Sortieren per Ziehen | erfüllt, Ziehen: Gerät | einrichtung_* |
+| Symbolauswahl: 386 Symbole in 21 Themenpaketen, durchsuchbar und nach Thema filterbar; 18 Farben | erfüllt | IconCatalogTest, farbauswahl |
 | Archiviertes bleibt in alten Einträgen sichtbar; Löschen nennt Zahl der Einträge und bietet Archivieren an | erfüllt | Code, Dialoge |
 | Erster Start mit Startpaketen „Allgemein“, „Schichtdienst“, leer | erfüllt | AppFlowTest |
 | Erinnerungen, Ziel-Erinnerungen, wichtige Tage, Berichte als Benachrichtigung | Gerät | Planung getestet (DataOpsTest), Zustellung nicht |
@@ -56,8 +57,12 @@ Belege: `AppFlowTest` und `DataOpsTest` laufen durch die echte App mit echter Da
 | `.daylio`-Backup lesen, Vorschau mit Zählwerten, leer oder zusammenführen, Bericht | erfüllt mit künstlicher Datei | DataOpsTest, DaylioBackupTest |
 | Zweiter Lauf ohne Doppelte, unterbrechbar | erfüllt | DataOpsTest |
 | Stolperstellen (Monat ab 0, Zeitzonen, HTML, Pfade, Dateityp am Inhalt, Namen kürzen) | erfüllt | DaylioBackupTest |
-| **Prüfzahlen des echten Backups (1.765 Einträge usw.)** | **offen** | Das echte Backup lag nicht vor. Feldnamen für Skalen und wichtige Tage sind Annahmen. Die Vorschau in der App zeigt alle Zählwerte und Hinweise zum Abgleich. |
-| CSV-Import mit Rückfrage, Export zeilengleich zur Vorlage | erfüllt für eigenes Format, Vergleich mit echter Datei offen | CsvFormatTest |
+| Prüfzahlen des echten Backups (1.765 Einträge, je Stufe 375/680/426/154/130, 1.751 Dateien, 1.743 Zuordnungen usw.) | erfüllt | `RealBackupTest` gegen `private/backup.daylio` (nur lokal, nur Zählwerte); wird ohne Datei übersprungen |
+| Skalenpunkte, Farben, Stimmungsfarben, Wochentags-Ziele aus dem echten Format | erfüllt | `RealBackupTest`, `DaylioBackupTest` mit Beispieldatei im echten Aufbau |
+| Einzelne Datei `backup.daylio` ohne ZIP, „Tagebuch ersetzen“ | erfüllt | DataOpsTest |
+| Erinnerungen und Kategorien wichtiger Tage, monatliche Ziele | abweichend | Bedeutung der Nummern unbekannt bzw. im Modell nicht vorhanden; der Import weist darauf hin |
+| CSV-Import mit Rückfrage; Stufe unbekannter Stimmungen wählt der Nutzer | erfüllt | CsvFormatTest, DataOpsTest |
+| CSV-Export zeilengleich zur Vorlage | offen | die echte CSV-Datei lag nicht vor |
 
 ## Konto und Abgleich
 | Punkt | Status | Beleg |

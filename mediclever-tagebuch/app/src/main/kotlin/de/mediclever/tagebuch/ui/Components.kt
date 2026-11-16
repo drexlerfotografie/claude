@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -316,9 +317,11 @@ fun ColorPicker(selected: Int?, onSelect: (Int) -> Unit, modifier: Modifier = Mo
 @Composable
 fun IconPickerDialog(selected: String, color: Color, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
-    val hits = remember(query) {
-        if (query.isBlank()) ActivityIcons
-        else ActivityIcons.filter { it.label.contains(query.trim(), true) || it.category.contains(query.trim(), true) || it.key.contains(query.trim(), true) }
+    var category by remember { mutableStateOf<String?>(null) }
+    val hits = remember(query, category) {
+        val base = if (category == null) ActivityIcons else ActivityIcons.filter { it.category == category }
+        if (query.isBlank()) base
+        else base.filter { it.label.contains(query.trim(), true) || it.category.contains(query.trim(), true) || it.key.contains(query.trim(), true) }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -329,6 +332,11 @@ fun IconPickerDialog(selected: String, color: Color, onSelect: (String) -> Unit,
                     query, { query = it }, placeholder = { Text("Suchen, z. B. Schlaf") }, singleLine = true,
                     leadingIcon = { Icon(Icons.Rounded.Search, null) }, modifier = Modifier.fillMaxWidth(),
                 )
+                // Themenpakete zum Eingrenzen
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(category == null, { category = null }, label = { Text("Alle") }, modifier = Modifier.height(48.dp))
+                    for (cat in IconCategories) FilterChip(category == cat, { category = if (category == cat) null else cat }, label = { Text(cat) }, modifier = Modifier.height(48.dp))
+                }
                 LazyVerticalGrid(GridCells.Adaptive(52.dp), Modifier.heightIn(max = 380.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (cat in IconCategories) {
                         val inCat = hits.filter { it.category == cat }

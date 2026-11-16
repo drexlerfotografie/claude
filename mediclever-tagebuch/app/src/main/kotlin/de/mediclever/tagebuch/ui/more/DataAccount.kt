@@ -12,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -86,7 +88,7 @@ fun DataScreen() {
         RowGroup {
             SettingRow("Sicherung erstellen", "Eine Datei mit allen Einträgen, Einstellungen, Fotos und Aufnahmen", Icons.Rounded.Save, onClick = { saveBackup.launch("tagebuch-$stamp.tagebuch") })
             RowDivider()
-            SettingRow("Wiederherstellen oder importieren", "Eigene Sicherung, Backup im Daylio-Format (.daylio) oder CSV-Datei", Icons.Rounded.Restore, onClick = { openFile.launch(arrayOf("*/*")) })
+            SettingRow("Wiederherstellen oder importieren", "Eigene Sicherung oder Backup im Daylio-Format (.daylio). CSV geht auch, bringt aber nur Einträge ohne Gruppen, Farben und Fotos mit.", Icons.Rounded.Restore, onClick = { openFile.launch(arrayOf("*/*")) })
         }
         Text("Fotos und Sprachnotizen liegen nur auf diesem Gerät. Erstelle regelmäßig eine Sicherung und bewahre sie an einem sicheren Ort auf. Die Datei ist nicht verschlüsselt.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SectionLabel("Export")
@@ -104,6 +106,7 @@ fun DataScreen() {
         is Opened.Archive -> {
             val empty = env.diary.entries.isEmpty()
             var mode by remember(o) { mutableStateOf(if (empty) MergeMode.EMPTY_ONLY else MergeMode.MERGE) }
+            var replace by remember(o) { mutableStateOf(false) }
             var progress by remember { mutableStateOf("") }
             AlertDialog(onDismissRequest = { if (busy.isEmpty()) opened = null }, title = { Text(o.kind) },
                 text = { Column(Modifier.verticalScrollCompat(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -111,8 +114,11 @@ fun DataScreen() {
                     PreviewTable(o.result.preview)
                     if (o.result.warnings.isNotEmpty()) { Text("Hinweise (${o.result.warnings.size})", style = MaterialTheme.typography.labelLarge); for (w in o.result.warnings) Text("• $w", style = MaterialTheme.typography.bodySmall) }
                     Text("Wie importieren?", style = MaterialTheme.typography.labelLarge)
-                    Row { RadioButton(mode == MergeMode.EMPTY_ONLY, { mode = MergeMode.EMPTY_ONLY }, enabled = empty); Column { Text("In ein leeres Tagebuch"); Text(if (empty) "Übernimmt auch die Einrichtung der Datei." else "Nur möglich, solange es keine Einträge gibt.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-                    Row { RadioButton(mode == MergeMode.MERGE, { mode = MergeMode.MERGE }); Column { Text("Mit dem bestehenden zusammenführen"); Text("Gleichnamige Stimmungen, Aktivitäten und Skalen werden zugeordnet. Nichts wird doppelt angelegt.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                    if (empty) Row { RadioButton(true, null); Column { Text("In ein leeres Tagebuch"); Text("Übernimmt auch die Einrichtung der Datei.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                    else {
+                        Row { RadioButton(!replace, { replace = false; mode = MergeMode.MERGE }); Column { Text("Mit dem bestehenden zusammenführen"); Text("Gleichnamige Stimmungen, Aktivitäten und Skalen werden zugeordnet. Einträge, die schon aus derselben Datei stammen, entstehen nicht doppelt. Einträge aus einem früheren CSV-Import dagegen schon.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                        Row { RadioButton(replace, { replace = true; mode = MergeMode.EMPTY_ONLY }); Column { Text("Bestehendes Tagebuch ersetzen"); Text("Löscht vorher alle ${env.diary.entries.size} Einträge, Fotos und die Einrichtung auf diesem Gerät und übernimmt dann genau den Inhalt der Datei. Richtig, wenn ein früherer Import fehlerhaft war.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } }
+                    }
                     if (progress.isNotEmpty()) Text(progress)
                     if (o.kind.contains("Daylio")) {
                         HorizontalDivider()
@@ -123,29 +129,38 @@ fun DataScreen() {
                 confirmButton = { TextButton({
                     busy = "Import läuft …"
                     scope.launch {
-                        try { outcome = c!!.dataOps.importArchive(o, mode) { done, total -> progress = "Dateien: $done von $total" }; opened = null }
+                        try { outcome = c!!.dataOps.importArchive(o, mode, replace) { done, total -> progress = "Dateien: $done von $total" }; opened = null }
                         catch (e: ImportException) { message = e.message ?: "Import fehlgeschlagen."; opened = null }
                         catch (e: Exception) { message = "Der Import wurde unterbrochen. Starte ihn einfach noch einmal, es entsteht nichts doppelt."; opened = null }
                         busy = ""
                     }
-                }, enabled = busy.isEmpty() && c != null) { Text("Importieren") } },
+                }, enabled = busy.isEmpty() && c != null) { Text(if (replace) "Ersetzen und importieren" else "Importieren") } },
                 dismissButton = { TextButton({ opened = null }, enabled = busy.isEmpty()) { Text("Abbrechen") } })
         }
         is Opened.Csv -> {
             val i = o.import
+            val levels = remember(o) { mutableStateMapOf<String, Int>().apply { i.unknownMoods.forEach { put(it, de.mediclever.tagebuch.core.importer.CsvFormat.suggestedMoodLevel(it)) } } }
             AlertDialog(onDismissRequest = { opened = null }, title = { Text("CSV-Datei") },
                 text = { Column(Modifier.verticalScrollCompat(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${plural(i.rows.size, "Eintrag", "Einträge")} gefunden. Fotos und Ziele sind in CSV-Dateien nicht enthalten.")
+                    Text("${plural(i.rows.size, "Eintrag", "Einträge")} gefunden. Eine CSV-Datei enthält weder Gruppen noch Farben, Symbole, Fotos oder Ziele. Für eine vollständige Übernahme nimm die Backup-Datei (.daylio).")
                     val unknown = i.unknownMoods.size + i.unknownActivities.size + i.unknownScales.size
                     if (unknown > 0) {
                         Text("Diese Dinge gibt es in deinem Tagebuch noch nicht. Beim Import werden sie angelegt:", style = MaterialTheme.typography.labelLarge)
-                        if (i.unknownMoods.isNotEmpty()) Text("Stimmungen: " + i.unknownMoods.joinToString(), style = MaterialTheme.typography.bodySmall)
+                        if (i.unknownMoods.isNotEmpty()) {
+                            Text("Eine CSV-Datei sagt nicht, wie gut oder schlecht eine Stimmung ist. Ordne bitte jede Stimmung einer Stufe zu, von der besten (links) bis zur schlechtesten (rechts):", style = MaterialTheme.typography.bodySmall)
+                            for (name in i.unknownMoods) Column {
+                                Text(name, style = MaterialTheme.typography.titleSmall)
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    for (l in 1..5) FilterChip(levels[name] == l, { levels[name] = l }, label = { de.mediclever.tagebuch.ui.icons.MoodFace(l, "a", 26.dp) }, modifier = Modifier.height(48.dp).semantics { contentDescription = "$name: " + de.mediclever.tagebuch.ui.home.levelName(l) })
+                                }
+                            }
+                        }
                         if (i.unknownActivities.isNotEmpty()) Text("Aktivitäten: " + i.unknownActivities.joinToString(), style = MaterialTheme.typography.bodySmall)
                         if (i.unknownScales.isNotEmpty()) Text("Skalen: " + i.unknownScales.joinToString { it.name }, style = MaterialTheme.typography.bodySmall)
                     }
                     for (w in i.warnings) Text("• $w", style = MaterialTheme.typography.bodySmall)
                 } },
-                confirmButton = { TextButton({ opened = null; if (c != null) run("Import läuft …") { outcome = c.dataOps.importCsv(o); "" } }, enabled = i.rows.isNotEmpty()) { Text(if (i.unknownMoods.size + i.unknownActivities.size + i.unknownScales.size > 0) "Anlegen und importieren" else "Importieren") } },
+                confirmButton = { TextButton({ opened = null; if (c != null) run("Import läuft …") { outcome = c.dataOps.importCsv(o, levels.toMap()); "" } }, enabled = i.rows.isNotEmpty()) { Text(if (i.unknownMoods.size + i.unknownActivities.size + i.unknownScales.size > 0) "Anlegen und importieren" else "Importieren") } },
                 dismissButton = { TextButton({ opened = null }) { Text("Abbrechen") } })
         }
         null -> {}
