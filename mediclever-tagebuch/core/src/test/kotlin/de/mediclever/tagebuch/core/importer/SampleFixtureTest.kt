@@ -83,8 +83,12 @@ class SampleFixtureTest {
         assertEquals(listOf("Super", "Gut", "Okay", "Schlecht", "Mies", "Erschöpft"), d.moods.map { it.name })
         assertEquals(listOf(1, 2, 3, 4, 5, 4), d.moods.map { it.level })
         assertEquals(listOf("Alltag", "Bewegung", "Menschen", "Dienst"), d.groups.map { it.name })
-        assertEquals(listOf(3, 8, 1, 6), d.groups.map { it.colorIndex }) // 3, 8, 13, 18 modulo 12
+        // Farbnummern 39, 25, 11 der Quell-Palette; die Gruppe ohne id_color wird neutral.
+        assertEquals(listOf(12, 6, 10, 0), d.groups.map { it.colorIndex })
         assertEquals(listOf(false, false, true, false), d.groups.map { it.collapsed })
+        // Eigene Farbe nur, wo id_color steht; sonst erbt die Aktivitaet (null).
+        assertEquals(expected.tagColors, d.tags.map { it.colorIndex })
+        assertEquals(listOf<Int?>(17, null, 1, null, 0, null, 14, null, 7, null, 16, 13, null, 12), d.tags.map { it.colorIndex })
 
         val tags = d.tags.associateBy { it.name }
         assertTrue("Putzen" in tags, "Leerzeichen am Ende werden entfernt")
@@ -100,19 +104,39 @@ class SampleFixtureTest {
 
         val (stress, energy, sleep) = d.scales
         assertEquals(ScaleType.TEXT, stress.type)
+        // Reihenfolge nach dem Feld order, nicht nach den Kennungen der Punkte.
         assertEquals(listOf("Kaum", "Etwas", "Deutlich", "Sehr hoch"), stress.points.map { it.label })
         assertEquals(listOf(1, 2, 3, 4), stress.points.map { it.position })
-        assertEquals(Trend.LOWER_IS_BETTER, stress.trend)
+        assertEquals(1, stress.min)
+        assertEquals(4, stress.max)
+        assertEquals(Trend.LOWER_IS_BETTER, stress.trend) // trend 1
+        assertEquals(ChartMode.DAILY_AVERAGE, stress.chartMode)
         assertEquals("Energie", energy.name)
+        assertEquals(ScaleType.TEXT, energy.type)
         assertEquals(5, energy.points.size)
         assertEquals(5, energy.max)
-        assertEquals(Trend.HIGHER_IS_BETTER, energy.trend)
+        assertEquals(Trend.HIGHER_IS_BETTER, energy.trend) // trend 2
         assertEquals(ScaleType.DURATION, sleep.type)
-        assertEquals(Trend.NEUTRAL, sleep.trend)
+        assertEquals(Trend.HIGHER_IS_BETTER, sleep.trend)
         assertEquals(ChartMode.DAILY_SUM, sleep.chartMode)
+        assertEquals(listOf(0, 24 * 60, 15), listOf(sleep.min, sleep.max, sleep.step))
         assertTrue(sleep.points.isEmpty())
+        // Farbnummern 3 und 14 sind bekannt, 27 nicht: fester Ersatz 27 mod 18.
+        assertEquals(listOf(1, 14, 9), d.scales.map { it.colorIndex })
+        // Gruppen und Skalen teilen sich eine Reihenfolge.
+        assertEquals(listOf(1, 2, 4, 5), d.groups.map { it.sortOrder })
+        assertEquals(listOf(3, 6, 7), d.scales.map { it.sortOrder })
 
-        assertEquals(7, d.settings.weekStart) // Wert 1 des Vorbilds ist Sonntag
+        val s = d.settings
+        assertEquals(7, s.weekStart) // Wert 1 des Vorbilds ist Sonntag
+        assertEquals("custom", s.moodScheme)
+        // Farbnummern 39, 40, 25, 1, 11 -> Palette 12, 4, 6, 17, 0; Stufe 1 zuerst.
+        assertEquals(listOf("FF7DBE2B", "FF2D8A5F", "FF4F7FC0", "FFF2C230", "FFB9303F"), s.customMoodColors)
+        assertFalse(s.showQuote)
+        assertTrue(s.showMemories)
+        assertTrue(s.reportNotifications, "Wochen- oder Monatsbericht ist an")
+        assertEquals(de.mediclever.tagebuch.core.model.MidnightRule.ASK, s.midnightRule)
+        assertEquals(now, s.updatedAt)
     }
 
     @Test fun entriesKeepLocalTimeAcrossTimeZones() {
@@ -144,6 +168,8 @@ class SampleFixtureTest {
         val d = imported.diary
         assertEquals(expected.entriesWithTextValue, d.entries.count { e -> e.scaleValues.any { it.pointId != null } })
         assertEquals(expected.entriesWithTimeValue, d.entries.count { e -> e.scaleValues.any { it.minutes != null } })
+        assertEquals(expected.scaleValues, d.entries.sumOf { it.scaleValues.size })
+        assertTrue(expected.scaleValues > 100)
         val pointIds = d.scales.flatMap { it.points }.map { it.id }.toSet()
         for (entry in d.entries) {
             assertTrue(entry.moodId in d.moodById)
@@ -191,35 +217,53 @@ class SampleFixtureTest {
 
     @Test fun goalsAndOtherLists() {
         val d = imported.diary
-        assertEquals(listOf("Jeden Tag lesen", "Sport", "Radfahren", "Früh ins Bett"), d.goals.map { it.name })
-        assertEquals(listOf(false, false, true, true), d.goals.map { it.archivedAt != null })
-        assertEquals(listOf(GoalRepeat.DAILY, GoalRepeat.TIMES_PER_WEEK, GoalRepeat.TIMES_PER_WEEK, GoalRepeat.DAILY), d.goals.map { it.repeat })
+        // Ziele mit Aktivitaet haben im Backup keinen Namen und heissen wie die Aktivitaet.
+        assertEquals(listOf("Lesen", "Sport", "Radfahren", "Früh ins Bett", "Spaziergang", "Großeinkauf"), d.goals.map { it.name })
+        assertEquals(listOf(false, false, true, true, false, true), d.goals.map { it.archivedAt != null })
+        assertEquals(
+            listOf(GoalRepeat.DAILY, GoalRepeat.TIMES_PER_WEEK, GoalRepeat.TIMES_PER_WEEK, GoalRepeat.WEEKDAYS, GoalRepeat.WEEKDAYS, GoalRepeat.TIMES_PER_WEEK),
+            d.goals.map { it.repeat },
+        )
         assertEquals(3, d.goals[1].timesPerWeek)
-        assertEquals(20 * 60 + 30, d.goals[0].reminderMinuteOfDay)
-        assertNull(d.goals[1].reminderMinuteOfDay)
+        assertEquals(2, d.goals[2].timesPerWeek)
+        assertTrue(d.goals[0].weekdays.isEmpty())
+        assertEquals(listOf(1, 2, 3, 4, 5), d.goals[3].weekdays) // Maske 62: Montag bis Freitag
+        assertEquals(listOf(7), d.goals[4].weekdays)             // Maske 1: Sonntag
+        assertEquals(1, d.goals[5].timesPerWeek)                 // monatlich gibt es hier nicht
+        assertEquals(listOf(20 * 60 + 30, null, null, null, 9 * 60 + 30, null), d.goals.map { it.reminderMinuteOfDay })
         assertEquals(d.tags.single { it.name == "Lesen" }.id, d.goals[0].tagId)
         assertNull(d.goals[3].tagId)
+        assertNull(d.goals[5].tagId)
+        // created_at ist Mitternacht Ortszeit (in UTC der 30.9.): es gilt der Tag am Ort.
         assertEquals("2023-10-01", d.goals[0].startDate)
+        assertEquals("2023-10-02", d.goals[1].startDate)
+        assertEquals(listOf(null, null, "2025-08-23", "2025-08-23", null, "2025-08-23"), d.goals.map { it.endDate })
+        assertEquals("Mindestens zehn Seiten", d.goals[0].note)
+        assertEquals(DaylioBackup.deterministicId("goal", "101"), d.goals[0].id)
 
-        // Monat ab 1: der erste Haken ist der 2.11.2023, der Dezember bleibt Dezember.
+        // goalEntries verweist auf goal_id. Monat ab 1: der erste Haken ist der 2.11.2023, der Dezember bleibt Dezember.
+        assertEquals(listOf(20, 12, 5, 3, 4, 2), d.goals.map { g -> d.goalChecks.count { it.goalId == g.id } })
         val first = d.goalChecks.filter { it.goalId == d.goals[0].id }.map { it.date }.sorted()
-        assertEquals(20, first.size)
         assertEquals("2023-11-02", first.first())
         assertEquals("2023-12-29", first.last())
+        val sundays = d.goalChecks.filter { it.goalId == d.goals[4].id }.map { java.time.LocalDate.parse(it.date).dayOfWeek.value }
+        assertEquals(listOf(7, 7, 7, 7), sundays)
         assertTrue(d.goalChecks.all { it.id == "${it.goalId}|${it.date}" })
-        assertTrue(imported.warnings.any { "ab 1 gezählt" in it && "Monat 12" in it })
 
         val (wedding, birthday, move) = d.importantDays
         assertEquals("2015-06-20", wedding.date)
-        assertTrue(wedding.remindOnDay)
-        assertEquals(listOf(7), wedding.remindDaysBefore)
+        assertEquals("Tisch reservieren", wedding.note)
         assertNotNull(wedding.assetId)
         assertTrue(wedding.assetId in d.assets.map { it.id })
+        assertTrue(wedding.yearly)
         assertEquals("Geburtstag Oma", birthday.name)
         assertEquals("1941-12-03", birthday.date)
-        assertEquals(listOf(1), birthday.remindDaysBefore)
+        assertEquals(wedding.assetId, birthday.assetId)
         assertEquals("2022-01-31", move.date)
         assertFalse(move.yearly)
+        assertNull(move.assetId)
+        // Kennzahlen der Erinnerungen und Kategorie-Nummern sind nicht entschluesselt: nichts wird geraten.
+        assertTrue(d.importantDays.all { !it.remindOnDay && it.remindDaysBefore.isEmpty() && it.category.isEmpty() })
 
         assertEquals(listOf("Dankbarkeit", "Dienst-Rückblick", "Abend"), d.templates.map { it.title })
         assertEquals("<p>Heute war …</p>", d.templates[2].body)
@@ -228,21 +272,47 @@ class SampleFixtureTest {
         assertEquals(listOf("", "Wie hast Du geschlafen?"), d.reminders.map { it.text })
     }
 
-    @Test fun warningsNameAssumptionsButNoContent() {
+    @Test fun warningsAreFewAndWithoutContent() {
+        // Der Aufbau ist belegt: es bleiben nur die Hinweise zu dem, was sich wirklich nicht uebernehmen laesst.
+        assertEquals(
+            listOf(
+                "1 monatliche Ziele wurden als „einmal pro Woche“ übernommen, weil es monatliche Ziele hier nicht gibt.",
+                "3 wichtige Tage tragen im Backup nur eine Kategorie-Nummer ohne Namen. Die Kategorie bleibt leer und lässt sich hier neu wählen.",
+                "2 wichtige Tage haben Erinnerungen in einer Form, die sich nicht sicher lesen lässt. Die Erinnerungen sind aus und lassen sich hier neu einstellen.",
+                "Einstellungen: Diese Angaben ließen sich nicht sicher lesen und bleiben auf der Voreinstellung: ENTRIES_AFTER_MIDNIGHT.",
+                "Farben: Die Farbnummern 27 des Backups sind hier nicht bekannt. Dafür wurde eine Ersatzfarbe vergeben, bitte bei Bedarf anpassen.",
+            ),
+            imported.warnings,
+        )
         val text = imported.warnings.joinToString("\n")
-        assertTrue("Skalen: Der Aufbau im Backup ist nicht sicher bekannt" in text, text)
-        assertTrue("„text_values“" in text, text)
-        assertTrue("Minuten" in text, text)
-        assertTrue("Wichtige Tage: Der Aufbau" in text, text)
-        // Unbekannte Felder werden mit Namen und Art genannt.
-        assertTrue("Liste „assets“: unbekannte Felder, nicht übernommen: android_metadata (Text)." in text, text)
-        assertTrue("createdAt (Zahl)" in text, text)
         // Nichts aus dem Tagebuch selbst.
-        for (secret in listOf("Schicht", "Jonas", "Hochzeit", "Oma", "Stress", "Lesen", "Dankbar", "geschlafen")) {
+        for (secret in listOf("Schicht", "Jonas", "Hochzeit", "Oma", "Stress", "Lesen", "Dankbar", "geschlafen", "Einkauf", "See")) {
             assertFalse(secret in text, "$secret in: $text")
         }
-        assertFalse("achievements" in text || "goalSuccessWeeks" in text, text)
-        assertFalse("übersprungen" in text, text)
+    }
+
+    @Test fun dataFileAloneGivesTheSameDiaryWithoutPhotos() {
+        val dir = Files.createTempDirectory("datendatei").toFile()
+        try {
+            // Nur der innere Teil des Archivs: Base64-kodiertes JSON, nicht gepackt.
+            val data = File(dir, "backup.daylio").apply { writeBytes(java.util.Base64.getEncoder().encode(sample.json.toByteArray())) }
+            assertFalse(DaylioBackup.looksLikeZip(data))
+            assertTrue(DaylioBackup.looksLikeZip(fixture))
+            val alone = DaylioBackup.readDataFile(data, now)
+            assertTrue(alone.assetFiles.isEmpty())
+            assertEquals(imported.preview, alone.preview)
+            assertEquals(imported.diary.entries, alone.diary.entries)
+            assertEquals(imported.diary.goals, alone.diary.goals)
+            assertEquals(imported.diary.assets.map { it.id }, alone.diary.assets.map { it.id })
+            assertEquals(imported.warnings, alone.warnings.dropLast(1))
+            assertTrue("nur die Datendatei" in alone.warnings.last() && "9 Fotos" in alone.warnings.last(), alone.warnings.last())
+            assertEquals(alone.diary, DaylioBackup.readData(data.readBytes(), now).diary)
+            // Ein Archiv ist keine Datendatei, eine fehlende Datei auch nicht.
+            assertFailsWith<ImportException> { DaylioBackup.readDataFile(fixture, now) }
+            assertFailsWith<ImportException> { DaylioBackup.readDataFile(File(dir, "fehlt.daylio"), now) }
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 
     @Test fun secondImportCreatesNoDuplicates() {
@@ -354,7 +424,7 @@ class SampleFixtureTest {
         }
         assertTrue(d.entries.none { e -> e.moodId == oldGut || oldLesen in e.tagIds || e.scaleValues.any { it.scaleId == oldStress.id } })
         assertTrue(incoming.entries.any { it.moodId == oldGut } && incoming.entries.any { oldLesen in it.tagIds })
-        assertEquals("t-lesen", d.goals.single { it.name == "Jeden Tag lesen" }.tagId)
+        assertEquals("t-lesen", d.goals.single { it.name == "Lesen" }.tagId)
         assertEquals("t-sport", d.goals.single { it.name == "Sport" }.tagId)
         assertEquals("g-alltag", d.tags.single { it.name == "Einkaufen" }.groupId)
         assertTrue(d.tags.none { it.groupId == oldAlltag } && d.groups.none { it.id == oldAlltag })

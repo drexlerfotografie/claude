@@ -45,8 +45,12 @@ import java.util.zip.ZipFile
  * festen IDs (aus Art und Quell-ID berechnet), sodass ein zweiter Import derselben
  * Datei dieselben IDs liefert und [DiaryMerge] keine Doppelten anlegt.
  *
- * Das JSON wird nachsichtig gelesen: fehlende Felder fuehren nie zum Absturz, unbekannte
- * Felder werden je Liste in den Hinweisen genannt (nur Feldnamen, keine Inhalte).
+ * Der Aufbau ist an einem echten Backup (Version 15) geprueft: Skalen mit text_scale.values
+ * bzw. time_scale, Werte der Eintraege unter scaleValues, Ziele mit goal_id und
+ * Wochentagsmaske, wichtige Tage mit isAnniversary, Farben als Nummern der Quell-Palette.
+ * Daneben wird das JSON weiter nachsichtig gelesen: fehlende Felder fuehren nie zum Absturz,
+ * andere Schreibweisen werden ueber naheliegende Feldnamen erkannt (dann mit Hinweis), und
+ * unbekannte Felder werden je Liste in den Hinweisen genannt (nur Feldnamen, keine Inhalte).
  * Alles, was nicht belegt ist, traegt im Code die Marke "ANNAHME:".
  */
 object DaylioBackup {
@@ -94,6 +98,44 @@ object DaylioBackup {
     fun fromJson(json: String, zipEntryNames: Collection<String>? = null, now: Long = System.currentTimeMillis()): DaylioImport {
         val archive = zipEntryNames?.let { Archive(it.toList(), { 0 }, { null }) }
         return Parser(parseRoot(json), archive, now).parse()
+    }
+
+    /**
+     * Liest eine einzelne Datendatei backup.daylio (Base64-kodiertes JSON, nicht gepackt), also
+     * den inneren Teil des Archivs. Das Ergebnis hat denselben Aufbau wie bei [read], aber keine
+     * [ImportResult.assetFiles]: die Fotos liegen nur im Archiv. Ein Hinweis nennt das.
+     * @throws ImportException wenn die Datei nicht lesbar oder kein Daylio-Backup ist.
+     */
+    fun readDataFile(dataFile: File, now: Long = System.currentTimeMillis()): DaylioImport {
+        if (!dataFile.isFile) throw ImportException("Die Datei konnte nicht gelesen werden.")
+        if (looksLikeZip(dataFile)) throw ImportException("Die Datei ist ein Archiv und keine einzelne Datendatei.")
+        if (dataFile.length() > MAX_JSON_BYTES) throw ImportException("Das Backup ist zu groß.")
+        val bytes = try {
+            dataFile.readBytes()
+        } catch (e: java.io.IOException) {
+            throw ImportException("Die Datei konnte nicht gelesen werden.", e)
+        }
+        return readData(bytes, now)
+    }
+
+    /** Wie [readDataFile], aber mit dem schon gelesenen Inhalt der Datendatei. */
+    fun readData(bytes: ByteArray, now: Long = System.currentTimeMillis()): DaylioImport {
+        val result = Parser(parseRoot(decodeBackupText(bytes)), null, now).parse()
+        val assets = result.preview.assets
+        val note = if (assets > 0) {
+            "Es wurde nur die Datendatei ohne das Archiv geöffnet. Die $assets Fotos und Sprachnotizen des Backups fehlen deshalb; " +
+                "sie stecken nur in der vollständigen Sicherungsdatei."
+        } else {
+            "Es wurde nur die Datendatei ohne das Archiv geöffnet. Fotos sind darin nicht enthalten."
+        }
+        return result.copy(assetFiles = emptyList(), warnings = result.warnings + note)
+    }
+
+    /** True, wenn die Datei wie ein ZIP-Archiv beginnt. Sonst kommt [readDataFile] in Frage. */
+    fun looksLikeZip(file: File): Boolean = try {
+        file.inputStream().use { it.readNBytes(4) }.let { it.size == 4 && it[0] == 'P'.code.toByte() && it[1] == 'K'.code.toByte() }
+    } catch (e: java.io.IOException) {
+        false
     }
 
     /** Inhalt von backup.daylio zu JSON-Text: Base64, zur Sicherheit auch unkodiertes JSON. */
@@ -199,20 +241,55 @@ object DaylioBackup {
 
     private fun utcDate(millis: Long): String = Instant.ofEpochMilli(millis).atOffset(ZoneOffset.UTC).toLocalDate().toString()
 
-    // Feldnamen-Kandidaten fuer die nicht belegten Teile des Formats.
-    // ANNAHME: Farbnummern stehen in einem dieser Felder.
-    private val COLOR_KEYS = arrayOf("id_color", "color_id", "colorId", "color", "color_index", "id_colour")
+    // ------------------------------------------------------------------ Farben
+
+    /**
+     * Farbnummer der Quell-App -> Index in der Palette dieser App. Belegt fuer die Nummern, die
+     * sich an Bildschirmfotos des Vorbilds zuordnen liessen. Palette: 0 Rot, 1 Orange, 2 Bernstein,
+     * 3 Hellgruen, 4 Gruen, 5 Petrol, 6 Blau, 7 Violett, 8 Magenta, 9 Braun, 10 Graublau,
+     * 11 Fast-Schwarz, 12 Limette, 13 Cyan, 14 Pink, 15 Hellviolett, 16 kraeftiges Blau, 17 Gelb.
+     */
+    private val SOURCE_COLOR_TO_PALETTE: Map<Long, Int> = mapOf(
+        1L to 17, 3L to 1, 11L to 0, 14L to 14, 20L to 15, 24L to 7, 25L to 6, 30L to 16, 31L to 13, 39L to 12, 40L to 4,
+    )
+
+    /** Neutrale Farbe (Graublau) fuer Gruppen und Skalen ohne eigene Farbnummer. */
+    private const val NEUTRAL_COLOR_INDEX = 10
+
+    /**
+     * ARGB-Werte der Palette (ohne #), Index wie oben. MUSS mit GroupPalette in Theme.kt der App
+     * uebereinstimmen: daraus werden die eigenen Stimmungsfarben berechnet.
+     */
+    internal val PALETTE_ARGB_MIRRORS_GROUP_PALETTE: List<String> = listOf(
+        "FFB9303F", "FFDD7F37", "FFD9A62E", "FF78A94E", "FF2D8A5F", "FF1F7A8C",
+        "FF4F7FC0", "FF6A4C93", "FFB05690", "FF8A6E52", "FF5C6B78", "FF2D323C",
+        "FF7DBE2B", "FF19B5B0", "FFE0558A", "FFA07BE0", "FF2F7BD9", "FFF2C230",
+    )
+
+    /** Einstellungen mit den fuenf eigenen Stimmungsfarben, Stufe 1 (beste) zuerst. */
+    private val MOOD_COLOR_PREFS = listOf(
+        "CUSTOM_COLOR_GREAT", "CUSTOM_COLOR_GOOD", "CUSTOM_COLOR_MEH", "CUSTOM_COLOR_FUGLY", "CUSTOM_COLOR_AWFUL",
+    )
+
+    /** Farb-Einstellungen des Vorbilds ohne Entsprechung hier (Farbschema der App, Hell/Dunkel-Zeitplan). */
+    private val IGNORED_COLOR_PREFS = setOf(
+        "COLOR_MODE", "COLOR_MODE_SCHEDULED_LIGHT_MODE_START", "COLOR_MODE_SCHEDULED_DARK_MODE_START",
+        "COLOR_PALETTE_CODE", "COLOR_PALETTE_DEFAULT_CODE", "COLOR_PALETTE_PREVIOUS_NON_CUSTOM_CODE", "CUSTOM_COLOR_PRIMARY",
+    )
+
+    // Feldnamen: der belegte Name steht jeweils vorn, dahinter Kandidaten fuer andere Schreibweisen.
+    private val COLOR_KEYS = arrayOf("id_color", "color", "color_id", "colorId", "color_index", "id_colour")
     private val NAME_KEYS = arrayOf("name", "title", "custom_name", "label", "text")
     private val ORDER_KEYS = arrayOf("order", "position", "sort_order", "index")
     private val STATE_KEYS = arrayOf("state", "is_archived", "archived")
-    // ANNAHME: Verweise auf Skala, Eintrag, Textpunkt und der Zeitwert heissen so oder aehnlich.
+    // Belegt: id_scale, id_text_scale_value, time_value. ANNAHME: die uebrigen Schreibweisen.
     private val SCALE_REF_KEYS = arrayOf("id_scale", "scale_id", "scaleId", "id_text_scale", "id_time_scale", "text_scale_id", "time_scale_id")
     private val ENTRY_REF_KEYS = arrayOf("id_day_entry", "day_entry_id", "dayEntryId", "id_entry", "entry_id", "entryId")
     private val TEXT_VALUE_KEYS = arrayOf("id_text_scale_value", "text_scale_value_id", "textScaleValueId", "id_scale_value", "id_value", "value_id")
     private val TIME_VALUE_KEYS = arrayOf("time_value", "timeValue", "duration", "time", "minutes")
     private val NUMBER_VALUE_KEYS = arrayOf("number_value", "numeric_value", "numberValue", "value")
     private val POINT_LIST_KEYS = arrayOf("text_values", "textValues", "values", "scale_values", "scaleValues", "text_scale_values", "textScaleValues", "points", "options", "items")
-    private val ENTRY_SCALE_LIST_KEYS = arrayOf("scales", "scale_values", "scaleValues", "scaleEntries", "scale_entries", "dayEntryScales")
+    private val ENTRY_SCALE_LIST_KEYS = arrayOf("scaleValues", "scales", "scale_values", "scaleEntries", "scale_entries", "dayEntryScales")
 
     private val TOP_LEVEL_HANDLED = setOf(
         "customMoods", "tag_groups", "tags", "dayEntries", "assets", "goals", "goalEntries",
@@ -223,6 +300,7 @@ object DaylioBackup {
     private val TOP_LEVEL_IGNORED = setOf(
         "version", "achievements", "goalSuccessWeeks", "daysInRowLongestChain", "metadata", "isReminderOn",
         "platform", "moodIconsPackId", "moodIconsDefaultFreePackId", "preferredMoodIconsIdsForMoodIdsForIconsPack",
+        "fontSchemeId",
     )
 
     private val DEFAULT_MOOD_NAMES = listOf("Super", "Gut", "Okay", "Schlecht", "Mies")
@@ -248,8 +326,42 @@ object DaylioBackup {
         fun fieldsOf(list: String) = fields.getOrPut(list) { Fields() }
         fun list(name: String): List<Obj> = objects(root[name] as? JsonArray).map { Obj(it, fieldsOf(name)) }
         fun id(kind: String, sourceId: Long) = deterministicId(kind, sourceId.toString())
-        fun color(obj: Obj): Int? = obj.long(*COLOR_KEYS)?.let { Math.floorMod(it, 12L).toInt() }
-        /** ANNAHME: state 0 ist aktiv, alles andere archiviert (belegt nur fuer tags: state 1). */
+        /** Quell-Farbnummern ohne belegte Zuordnung, fuer genau einen Hinweis am Ende. */
+        val unknownColors = sortedSetOf<Long>()
+
+        /** Index in der App-Palette zu einer Farbnummer des Vorbilds. */
+        fun paletteIndex(sourceColor: Long): Int = SOURCE_COLOR_TO_PALETTE[sourceColor] ?: run {
+            // ANNAHME: unbekannte Nummern bekommen eine feste Ersatzfarbe (Rest bei Teilung durch die Palettengroesse).
+            unknownColors.add(sourceColor)
+            Math.floorMod(sourceColor, PALETTE_ARGB_MIRRORS_GROUP_PALETTE.size.toLong()).toInt()
+        }
+
+        fun color(obj: Obj): Int? = obj.long(*COLOR_KEYS)?.let { paletteIndex(it) }
+
+        /** (Zeitpunkt, Versatz in ms) aller Eintraege, aufsteigend; gefuellt von [readEntries]. */
+        var entryOffsets: List<Pair<Long, Long>> = emptyList()
+
+        /**
+         * Ortsdatum eines Zeitpunkts ohne eigenen Versatz (Ziele: created_at ist Mitternacht Ortszeit,
+         * in UTC also oft der Vortag). ANNAHME: es gilt der Versatz des zeitlich naechsten Eintrags;
+         * ohne Eintraege UTC. Unabhaengig von der Zeitzone des Geraets, auf dem importiert wird.
+         */
+        fun localDateOf(millis: Long): String {
+            val list = entryOffsets
+            if (list.isEmpty()) return utcDate(millis)
+            var lo = 0
+            var hi = list.size - 1
+            while (lo < hi) {
+                val mid = (lo + hi) / 2
+                if (list[mid].first < millis) lo = mid + 1 else hi = mid
+            }
+            val after = list[lo]
+            val before = list[(lo - 1).coerceAtLeast(0)]
+            val nearest = if (Math.abs(before.first - millis) <= Math.abs(after.first - millis)) before else after
+            return utcDate(millis + nearest.second)
+        }
+
+        /** state 0 ist aktiv, 1 archiviert (belegt fuer Aktivitaeten und Ziele). ANNAHME: jeder andere Wert ausser 0 ebenfalls. */
         fun archived(obj: Obj): Long? = if ((obj.long(*STATE_KEYS) ?: 0L) != 0L) now else null
 
         val moodIds = HashMap<Long, String>()
@@ -273,6 +385,12 @@ object DaylioBackup {
             val templates = readTemplates()
             val reminders = readReminders()
             val settings = readPrefs()
+            if (unknownColors.isNotEmpty()) {
+                warnings.add(
+                    "Farben: Die Farbnummern ${unknownColors.joinToString()} des Backups sind hier nicht bekannt. " +
+                        "Dafür wurde eine Ersatzfarbe vergeben, bitte bei Bedarf anpassen.",
+                )
+            }
             reportUnknown()
 
             val diary = Diary(
@@ -298,7 +416,7 @@ object DaylioBackup {
                 val custom = obj.string("custom_name")?.trim().orEmpty()
                 // Leerer Name: Standardstimmung des Vorbilds (rad, good, meh, bad, awful).
                 val name = custom.ifEmpty { DEFAULT_MOOD_NAMES[(predefined?.takeIf { it in 1..5 } ?: level) - 1] }
-                obj.element("icon_id") // Symbolnummern des Vorbilds lassen sich nicht uebernehmen.
+                obj.element("icon_id", "createdAt") // Symbolnummern des Vorbilds lassen sich nicht uebernehmen.
                 val mood = Mood(
                     id = id("mood", sourceId),
                     level = level,
@@ -319,11 +437,12 @@ object DaylioBackup {
         fun readGroups(): List<TagGroup> {
             val result = ArrayList<TagGroup>()
             var noId = 0
-            var noColor = 0
             list("tag_groups").forEachIndexed { index, obj ->
                 val sourceId = obj.long("id") ?: run { noId++; return@forEachIndexed }
                 val order = obj.int(*ORDER_KEYS) ?: index
-                val colorIndex = color(obj) ?: run { noColor++; Math.floorMod(order, 12) }
+                // Gruppen ohne id_color zeigt das Vorbild in seiner Standardfarbe; hier neutral.
+                val colorIndex = color(obj) ?: NEUTRAL_COLOR_INDEX
+                obj.element("id_predefined")
                 val group = TagGroup(
                     id = id("group", sourceId),
                     name = obj.string("name")?.trim().orEmpty().ifEmpty { "Gruppe ${index + 1}" },
@@ -338,7 +457,6 @@ object DaylioBackup {
                 result.add(group)
             }
             if (noId > 0) warnings.add("$noId Gruppen ohne Kennung wurden übersprungen.")
-            if (noColor > 0) warnings.add("$noColor Gruppen ohne erkennbare Farbnummer: die Farbe wurde nach der Reihenfolge vergeben.")
             return result
         }
 
@@ -353,14 +471,14 @@ object DaylioBackup {
                 val groupId = groupSource?.let { groupIds[it] }
                 // 0 und negative Werte bedeuten "ohne Gruppe" und sind kein Fehler.
                 if (groupSource != null && groupSource > 0 && groupId == null) lostGroup++
-                obj.element("icon", "icon_id", "id_icon")
+                obj.element("icon", "icon_id", "id_icon", "createdAt")
                 val tag = Tag(
                     id = id("tag", sourceId),
                     groupId = groupId,
                     name = name,
                     icon = IconGuess.guess(name),
-                    // ANNAHME: Farbnummer 0 oder fehlend heisst "Farbe der Gruppe".
-                    colorIndex = obj.long(*COLOR_KEYS)?.takeIf { it > 0 }?.let { Math.floorMod(it, 12L).toInt() },
+                    // Fehlendes id_color heisst "Farbe der Gruppe" (belegt). ANNAHME: 0 und negative Werte ebenso.
+                    colorIndex = obj.long(*COLOR_KEYS)?.takeIf { it > 0 }?.let { paletteIndex(it) },
                     sortOrder = obj.int(*ORDER_KEYS) ?: index,
                     archivedAt = archived(obj),
                     updatedAt = now,
@@ -401,6 +519,7 @@ object DaylioBackup {
                 val createdAt = obj.long("createdAt", "created_at") ?: 0L
                 val offset = obj.long("createdAtOffset", "created_at_offset") ?: 0L
                 obj.long("type")?.let { types.add(it) }
+                obj.element("android_metadata")
                 val assetId = id("asset", sourceId)
                 val candidates = byName[checksum].orEmpty()
                 val year = utcDate(createdAt + offset).substring(0, 4)
@@ -429,8 +548,14 @@ object DaylioBackup {
             return assets to files
         }
 
-        // -------------------------------------------------- Skalen (Aufbau nicht belegt, daher Heuristik)
+        // -------------------------------------------------- Skalen
 
+        /**
+         * Belegter Aufbau: scales[] mit type (0 = Textskala, 2 = Zeitskala), den Punkten unter
+         * text_scale.values und den Werten im Eintrag unter scaleValues (id_scale mit
+         * id_text_scale_value oder time_value in Minuten). Andere Schreibweisen werden weiter
+         * ueber Feldnamen erraten; dann nennt ein Hinweis, was angenommen wurde.
+         */
         inner class ScaleReader(entryObjs: List<Obj>) {
             private val rawValues = ArrayList<RawScaleValue>()
             private val scaleIds = HashMap<Long, String>()
@@ -459,7 +584,7 @@ object DaylioBackup {
                 (TEXT_VALUE_KEYS.asList() + TIME_VALUE_KEYS.asList() + SCALE_REF_KEYS.asList()).any { it in o }
 
             private fun collectEntryValues(entryObjs: List<Obj>) {
-                // Variante 1: Liste im Eintrag.
+                // Belegt: Liste scaleValues im Eintrag. Sonst eine aehnlich benannte Liste.
                 for (entry in entryObjs) {
                     val entryId = entry.json["id"].asLong() ?: continue
                     val key = ENTRY_SCALE_LIST_KEYS.firstOrNull { entry.json[it] is JsonArray }
@@ -467,11 +592,11 @@ object DaylioBackup {
                             k != "tags" && k != "assets" && v is JsonArray && objects(v).any(::looksLikeValue)
                         }?.key
                         ?: continue
-                    entryListKey = key
+                    if (entryListKey == null || key != ENTRY_SCALE_LIST_KEYS.first()) entryListKey = key
                     val valueFields = fieldsOf("dayEntries.$key")
                     for (o in objects(entry.array(key))) rawValues.add(rawValue(entryId, Obj(o, valueFields)))
                 }
-                // Variante 2: eigene Liste auf oberster Ebene mit Verweis auf den Eintrag.
+                // ANNAHME (anderer Aufbau): eigene Liste auf oberster Ebene mit Verweis auf den Eintrag.
                 for ((key, value) in root) {
                     if (key in TOP_LEVEL_HANDLED || key in TOP_LEVEL_IGNORED || value !is JsonArray) continue
                     val objs = objects(value)
@@ -509,6 +634,19 @@ object DaylioBackup {
                 return result
             }
 
+            /** Belegter Aufbau: text_scale = {id, id_scale, metric, values: [{id, id_text_scale, order, name}]}. */
+            private fun textScalePoints(textScale: JsonObject): List<RawPoint> {
+                val holder = Obj(textScale, fieldsOf("scales.text_scale"))
+                holder.element("id", "id_scale", "metric")
+                val pointFields = fieldsOf("scales.text_scale.values")
+                return objects(holder.array("values")).mapIndexed { index, o ->
+                    val obj = Obj(o, pointFields)
+                    obj.element("id_text_scale")
+                    RawPoint(obj.long("id"), obj.string("name")?.trim().orEmpty(), obj.long("order"), index)
+                }
+            }
+
+            /** Andere Schreibweisen: eine Liste von Punkten direkt in der Skala. */
             private fun nestedPoints(scale: Obj, usedKeys: MutableSet<String>): List<RawPoint> {
                 val key = POINT_LIST_KEYS.firstOrNull { scale.json[it] is JsonArray }
                     ?: scale.json.entries.firstOrNull { (_, v) -> v is JsonArray && objects(v).any { o -> NAME_KEYS.any { it in o } } }?.key
@@ -537,11 +675,13 @@ object DaylioBackup {
                 val external = topLevelPoints()
                 val nestedKeys = sortedSetOf<String>()
                 val typeGuesses = sortedSetOf<String>()
-                val trendValues = sortedSetOf<String>()
+                val unknownTrends = sortedSetOf<Long>()
                 val chartValues = sortedSetOf<String>()
                 var chartKey: String? = null
                 val usage = rawValues.filter { it.scaleId != null }.groupBy { it.scaleId!! }
-                determineTimeUnit()
+                // Im belegten Aufbau sind Zeitwerte Minuten (360 = sechs Stunden). Nur sonst wird die Einheit geschaetzt.
+                val verifiedShape = scaleObjs.any { it.json["text_scale"] is JsonObject || it.json["time_scale"] is JsonObject }
+                if (!verifiedShape) determineTimeUnit()
 
                 val result = ArrayList<Scale>()
                 var noId = 0
@@ -549,12 +689,27 @@ object DaylioBackup {
                     val sourceId = obj.long("id") ?: run { noId++; return@forEachIndexed }
                     val scaleId = id("scale", sourceId)
                     val name = obj.string(*NAME_KEYS)?.trim().orEmpty().ifEmpty { "Skala ${index + 1}" }
-                    val rawPoints = nestedPoints(obj, nestedKeys).ifEmpty { external[sourceId].orEmpty() }
+                    // Ohne Entsprechung hier: Vorgaben des Vorbilds, Anlagezeit, auf-/zugeklappt in Formular und Statistik.
+                    obj.element(
+                        "predefined", "created_at", "created_at_offset",
+                        "is_expanded_in_form", "is_expanded_in_stats", "is_expanded_in_stats_detail",
+                    )
+                    val textScale = obj.element("text_scale") as? JsonObject
+                    val numberScale = (obj.element("number_scale") as? JsonObject)?.let { Obj(it, fieldsOf("scales.number_scale")) }
+                    numberScale?.element("id", "id_scale", "metric", "predefined_unit")
+                    (obj.element("time_scale") as? JsonObject)?.let { Obj(it, fieldsOf("scales.time_scale")).element("id", "id_scale", "metric") }
+                    val rawPoints = textScale?.let { textScalePoints(it) }
+                        ?: nestedPoints(obj, nestedKeys).ifEmpty { external[sourceId].orEmpty() }
 
-                    // Typ: zuerst ein ausdrueckliches Feld, dann die Punkte, dann die Art der Werte in den Eintraegen.
-                    val typeText = obj.string("type", "scale_type", "scaleType", "id_type", "value_type", "id_scale_type", "kind")?.lowercase().orEmpty()
+                    // Typ: belegt sind die Zahlen 0 (Text) und 2 (Zeit). Sonst ein Textfeld, die Punkte oder die Art der Werte.
+                    val typeText = obj.string("type", "scale_type", "scaleType", "id_type", "value_type", "id_scale_type", "kind")?.trim()?.lowercase().orEmpty()
                     val used = usage[sourceId].orEmpty()
                     val type = when {
+                        // Textskalen tragen zusaetzlich ein number_scale; die Eintraege verweisen aber immer auf Textpunkte.
+                        typeText == "0" -> ScaleType.TEXT
+                        typeText == "2" -> ScaleType.DURATION
+                        // ANNAHME: Typ 1 waere eine reine Zahlenskala; kam im geprueften Backup nicht vor.
+                        typeText == "1" -> ScaleType.NUMBER.also { typeGuesses.add("Typ 1 als Zahlenskala angenommen") }
                         "text" in typeText || "select" in typeText || "choice" in typeText -> ScaleType.TEXT.also { typeGuesses.add("Feld für den Typ") }
                         "time" in typeText || "dur" in typeText -> ScaleType.DURATION.also { typeGuesses.add("Feld für den Typ") }
                         "num" in typeText || "int" in typeText -> ScaleType.NUMBER.also { typeGuesses.add("Feld für den Typ") }
@@ -562,11 +717,11 @@ object DaylioBackup {
                         used.any { it.time != null } -> ScaleType.DURATION.also { typeGuesses.add("Art der Werte in den Einträgen") }
                         used.any { it.textPointId != null } -> ScaleType.TEXT.also { typeGuesses.add("Art der Werte in den Einträgen") }
                         used.any { it.number != null } -> ScaleType.NUMBER.also { typeGuesses.add("Art der Werte in den Einträgen") }
-                        // ANNAHME: eine Skala ohne Punkte und ohne Werte ist eine Zeitskala (es gibt im Vorbild nur Text und Zeit).
+                        // ANNAHME: eine Skala ohne Typ, ohne Punkte und ohne Werte ist eine Zeitskala.
                         else -> ScaleType.DURATION.also { typeGuesses.add("keine Anhaltspunkte, als Zeitskala angenommen") }
                     }
 
-                    // ANNAHME: die Punkte stehen in aufsteigender Reihenfolge (erster Punkt = Position 1).
+                    // Position = Rang nach dem Feld order (belegt: 1 bis n aufsteigend, die Quell-IDs sind nicht sortiert).
                     val sorted = rawPoints.sortedWith(compareBy({ it.order ?: it.index.toLong() }, { it.index }))
                     val scalePoints = if (type != ScaleType.TEXT) emptyList() else sorted.mapIndexed { i, p ->
                         ScalePoint(
@@ -580,25 +735,26 @@ object DaylioBackup {
                         pointsByPosition[sourceId] = scalePoints.associateBy { it.position }
                     }
 
-                    // ANNAHME: trend 1 = hoeher ist besser, 2 = niedriger ist besser, sonst neutral; Text wird nach Stichwort gelesen.
-                    val trendRaw = obj.string("trend", "trend_type", "id_trend")
-                    trendRaw?.let { trendValues.add(it) }
+                    // Belegt an der Bedeutung der Skalen im echten Backup: trend 2 = hoeher ist besser, 1 = niedriger ist besser.
+                    val trendRaw = obj.string("trend", "trend_type", "id_trend")?.trim()
                     val trend = when {
                         trendRaw == null -> if (type == ScaleType.DURATION) Trend.NEUTRAL else Trend.HIGHER_IS_BETTER
-                        Regex("high|up|pos|more").containsMatchIn(trendRaw.lowercase()) || trendRaw == "1" -> Trend.HIGHER_IS_BETTER
-                        Regex("low|down|neg|less").containsMatchIn(trendRaw.lowercase()) || trendRaw == "2" -> Trend.LOWER_IS_BETTER
-                        else -> Trend.NEUTRAL
+                        trendRaw == "2" || Regex("high|up|pos|more").containsMatchIn(trendRaw.lowercase()) -> Trend.HIGHER_IS_BETTER
+                        trendRaw == "1" || Regex("low|down|neg|less").containsMatchIn(trendRaw.lowercase()) -> Trend.LOWER_IS_BETTER
+                        // ANNAHME: jeder andere Wert (auch 0) bedeutet "weder noch".
+                        else -> Trend.NEUTRAL.also { trendRaw.toLongOrNull()?.let { n -> unknownTrends.add(n) } }
                     }
 
-                    // ANNAHME: die Diagramm-Anzeige steht in einem dieser Felder; "sum"/"total" oder 1 bedeutet Tagessumme.
+                    // Das Backup nennt keine Diagramm-Anzeige: Zeiten werden je Tag summiert, alles andere gemittelt.
+                    // ANNAHME (anderer Aufbau): steht doch ein solches Feld da, bedeutet "sum"/"total" oder 1 die Tagessumme.
                     val chartKeys = arrayOf("chart_type", "chartType", "chart_mode", "chart_display", "chart", "id_chart_type", "display_type", "aggregation", "daily_aggregation")
                     obj.usedKey(*chartKeys)?.let { chartKey = it }
                     val chartRaw = obj.string(*chartKeys)
                     chartRaw?.let { chartValues.add(it) }
-                    val chartMode = if (chartRaw != null && (Regex("sum|total").containsMatchIn(chartRaw.lowercase()) || chartRaw == "1")) {
-                        ChartMode.DAILY_SUM
-                    } else {
-                        ChartMode.DAILY_AVERAGE
+                    val chartMode = when {
+                        chartRaw == null -> if (type == ScaleType.DURATION) ChartMode.DAILY_SUM else ChartMode.DAILY_AVERAGE
+                        Regex("sum|total").containsMatchIn(chartRaw.lowercase()) || chartRaw == "1" -> ChartMode.DAILY_SUM
+                        else -> ChartMode.DAILY_AVERAGE
                     }
 
                     val minutesUsed = used.mapNotNull { minutesOf(it.time) }
@@ -607,26 +763,34 @@ object DaylioBackup {
                         type = type,
                         name = name,
                         icon = IconGuess.guess(name).let { if (it == IconGuess.FALLBACK) "tune" else it },
-                        colorIndex = color(obj) ?: Math.floorMod(index, 12),
+                        colorIndex = color(obj) ?: NEUTRAL_COLOR_INDEX,
+                        // Teilt sich den Zahlenraum mit tag_groups.order.
                         sortOrder = obj.int(*ORDER_KEYS) ?: index,
                         chartMode = chartMode,
                         trend = trend,
                         min = when (type) {
                             ScaleType.TEXT -> 1
                             ScaleType.DURATION -> 0
-                            ScaleType.NUMBER -> minOf(obj.int("min", "min_value", "minValue") ?: 1, used.mapNotNull { it.number }.minOrNull()?.toInt() ?: Int.MAX_VALUE)
+                            ScaleType.NUMBER -> minOf(
+                                obj.int("min", "min_value", "minValue") ?: numberScale?.int("min") ?: 1,
+                                used.mapNotNull { it.number }.minOrNull()?.toInt() ?: Int.MAX_VALUE,
+                            )
                         },
                         max = when (type) {
                             ScaleType.TEXT -> scalePoints.size.coerceAtLeast(1)
                             // Ein Tag als Obergrenze, ausser es kommen laengere Werte vor.
                             ScaleType.DURATION -> maxOf(24 * 60, minutesUsed.maxOrNull() ?: 0)
-                            ScaleType.NUMBER -> maxOf(obj.int("max", "max_value", "maxValue") ?: 10, used.mapNotNull { it.number }.maxOrNull()?.toInt() ?: Int.MIN_VALUE)
+                            ScaleType.NUMBER -> maxOf(
+                                obj.int("max", "max_value", "maxValue") ?: numberScale?.int("max") ?: 10,
+                                used.mapNotNull { it.number }.maxOrNull()?.toInt() ?: Int.MIN_VALUE,
+                            )
                         },
                         step = if (type == ScaleType.DURATION) durationStep(minutesUsed) else 1,
                         points = scalePoints,
                         archivedAt = archived(obj),
                         updatedAt = now,
                     )
+                    numberScale?.element("min", "max")
                     obj.element("icon", "icon_id", "id_icon")
                     scaleIds[sourceId] = scaleId
                     scaleTypes[sourceId] = type
@@ -634,19 +798,22 @@ object DaylioBackup {
                 }
 
                 if (noId > 0) warnings.add("$noId Skalen ohne Kennung wurden übersprungen.")
-                // Jede Annahme sichtbar machen, damit sich die echte Datei auf dem Handy pruefen laesst.
-                warnings.add(
-                    "Skalen: Der Aufbau im Backup ist nicht sicher bekannt und wurde erschlossen. " +
-                        "Typ bestimmt über: ${typeGuesses.joinToString("; ").ifEmpty { "–" }}. " +
-                        "Textpunkte aus: ${if (nestedKeys.isNotEmpty()) "Feld ${nestedKeys.joinToString { "„$it“" }} der Skala" else if (external.isNotEmpty()) "eigener Liste" else "nicht gefunden"}. " +
-                        "Werte der Einträge aus: ${entryListKey?.let { "Feld „$it“ im Eintrag" } ?: valueListTopLevel?.let { "Liste „$it“" } ?: "nicht gefunden"}.",
-                )
-                if (result.any { it.type == ScaleType.DURATION } && rawValues.any { it.time != null }) {
+                // Nur wenn etwas erschlossen werden musste: jede Annahme sichtbar machen.
+                val valuesAssumed = valueListTopLevel != null || (entryListKey != null && entryListKey != ENTRY_SCALE_LIST_KEYS.first())
+                if (typeGuesses.isNotEmpty() || nestedKeys.isNotEmpty() || external.isNotEmpty() || valuesAssumed) {
+                    warnings.add(
+                        "Skalen: Der Aufbau weicht vom bekannten Backup ab und wurde erschlossen. " +
+                            "Typ bestimmt über: ${typeGuesses.joinToString("; ").ifEmpty { "Feld „type“" }}. " +
+                            "Textpunkte aus: ${if (nestedKeys.isNotEmpty()) "Feld ${nestedKeys.joinToString { "„$it“" }} der Skala" else if (external.isNotEmpty()) "eigener Liste" else "„text_scale“ oder nicht vorhanden"}. " +
+                            "Werte der Einträge aus: ${valueListTopLevel?.let { "Liste „$it“" } ?: entryListKey?.let { "Feld „$it“ im Eintrag" } ?: "nicht gefunden"}.",
+                    )
+                }
+                if (!verifiedShape && result.any { it.type == ScaleType.DURATION } && rawValues.any { it.time != null }) {
                     val unit = when (timeDivisor) { 60_000L -> "Millisekunden"; 60L -> "Sekunden"; else -> "Minuten" }
                     warnings.add("Skalen: Zeitwerte wurden als $unit gelesen (Annahme anhand der Größe der Werte). Bitte an einem bekannten Eintrag prüfen.")
                 }
-                if (trendValues.isNotEmpty()) {
-                    warnings.add("Skalen: Trend-Werte im Backup: ${trendValues.joinToString()}. Angenommen: 1 = höher ist besser, 2 = niedriger ist besser, sonst neutral.")
+                if (unknownTrends.isNotEmpty()) {
+                    warnings.add("Skalen: Die Trend-Werte ${unknownTrends.joinToString()} sind nicht bekannt (bekannt: 1 = niedriger ist besser, 2 = höher ist besser). Diese Skalen wurden als neutral übernommen.")
                 }
                 if (chartValues.isNotEmpty()) {
                     warnings.add("Skalen: Diagramm-Anzeige aus Feld „$chartKey“ mit den Werten ${chartValues.joinToString()}. Angenommen: 1 oder „sum“ = Tagessumme, sonst Tagesdurchschnitt.")
@@ -657,9 +824,9 @@ object DaylioBackup {
             }
 
             /**
-             * ANNAHME zur Einheit des Zeitwerts: sind alle Werte durch 60.000 teilbar, sind es
-             * Millisekunden; sind alle durch 60 teilbar und groesser als ein Tag in Minuten,
-             * sind es Sekunden; sonst Minuten.
+             * Nur fuer abweichende Schreibweisen (ohne text_scale/time_scale). ANNAHME zur Einheit
+             * des Zeitwerts: sind alle Werte durch 60.000 teilbar, sind es Millisekunden; sind alle
+             * durch 60 teilbar und groesser als ein Tag in Minuten, sind es Sekunden; sonst Minuten.
              */
             private fun determineTimeUnit() {
                 val numbers = rawValues.mapNotNull { it.time.asLong()?.takeIf { v -> v > 0 } }
@@ -684,8 +851,9 @@ object DaylioBackup {
                 return (value / timeDivisor).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             }
 
+            /** Viertelstunden, ausser die vorhandenen Werte brauchen eine feinere Teilung. */
             private fun durationStep(minutes: List<Int>): Int =
-                listOf(60, 30, 15, 10, 5).firstOrNull { step -> minutes.isNotEmpty() && minutes.all { it % step == 0 } } ?: if (minutes.isEmpty()) 15 else 1
+                listOf(15, 5).firstOrNull { step -> minutes.all { it % step == 0 } } ?: 1
 
             private val byEntry: Map<Long, List<RawScaleValue>> by lazy { rawValues.groupBy { it.entryId } }
             var dropped = 0
@@ -712,10 +880,18 @@ object DaylioBackup {
                         ScaleType.NUMBER -> raw.number?.let { ScaleValue(scaleId = scaleId, number = it.toInt()) }
                         null -> null
                     }
-                    if (value == null) dropped++ else if (result.none { it.scaleId == scaleId }) result.add(value)
+                    when {
+                        value == null -> dropped++
+                        result.none { it.scaleId == scaleId } -> result.add(value)
+                        // Zwei Werte derselben Skala in einem Eintrag: das Modell kennt nur einen.
+                        else -> repeated++
+                    }
                 }
                 return result
             }
+
+            var repeated = 0
+                private set
         }
 
         // -------------------------------------------------- Eintraege
@@ -803,6 +979,8 @@ object DaylioBackup {
             if (lostTags > 0) warnings.add("$lostTags Verweise auf unbekannte Aktivitäten wurden aus Einträgen entfernt.")
             if (lostAssets > 0) warnings.add("$lostAssets Verweise auf unbekannte Dateien wurden aus Einträgen entfernt.")
             if (scaleReader.dropped > 0) warnings.add("${scaleReader.dropped} Skalenwerte konnten keiner Skala oder keinem Punkt zugeordnet werden.")
+            if (scaleReader.repeated > 0) warnings.add("${scaleReader.repeated} Skalenwerte waren im selben Eintrag doppelt vorhanden. Übernommen wurde jeweils der erste.")
+            entryOffsets = result.map { it.timestamp to it.offsetMinutes * 60_000L }.sortedBy { it.first }
             (root["metadata"] as? JsonObject)?.get("number_of_entries").asLong()?.let { expected ->
                 if (expected != entryObjs.size.toLong()) warnings.add("Das Backup nennt $expected Einträge, enthalten sind ${entryObjs.size}.")
             }
@@ -815,42 +993,56 @@ object DaylioBackup {
             val goalObjs = list("goals")
             val checkObjs = list("goalEntries")
 
-            // Worauf zeigt goalEntries.goalId: auf "goal_id" oder auf "id" des Ziels? Was oefter passt, gewinnt.
+            // Belegt: goalEntries.goalId zeigt auf goals.goal_id (nicht auf goals.id). Fuer andere
+            // Schreibweisen: passt "id" eindeutig besser zu den Verweisen, gilt "id" (mit Hinweis).
             val refs = checkObjs.mapNotNull { it.long("goalId", "goal_id", "id_goal") }
             val byGoalId = goalObjs.mapNotNull { it.long("goal_id") }.toSet()
             val byId = goalObjs.mapNotNull { it.long("id") }.toSet()
             val useGoalId = byGoalId.isNotEmpty() && refs.count { it in byGoalId } >= refs.count { it in byId }
-            if (byGoalId.isNotEmpty() && byGoalId != byId) {
-                warnings.add("Ziele: „id“ und „goal_id“ unterscheiden sich. Abgehakte Tage wurden über „${if (useGoalId) "goal_id" else "id"}“ zugeordnet.")
+            if (byGoalId.isNotEmpty() && !useGoalId) {
+                warnings.add("Ziele: Die abgehakten Tage passen nicht zu „goal_id“ und wurden deshalb über „id“ zugeordnet.")
             }
 
             val goalIds = HashMap<Long, String>()
             val goals = ArrayList<Goal>()
             val createdDates = HashMap<String, String>()
-            val repeatTypes = sortedSetOf<Long>()
+            val unknownRepeat = sortedSetOf<Long>()
             var noId = 0
-            var weekdayMask = 0
             var monthly = 0
             goalObjs.forEachIndexed { index, obj ->
                 val sourceId = (if (useGoalId) obj.long("goal_id") else null) ?: obj.long("id")
                 obj.long("goal_id")
                 if (sourceId == null) { noId++; return@forEachIndexed }
+                // id_tag -1 heisst "ohne Aktivitaet". Der Name fehlt meist; dann gilt der Name der Aktivitaet.
                 val tag = obj.long("id_tag", "tag_id")?.let { tagIds[it] }?.let { tagsById[it] }
                 val name = obj.string("name")?.trim().orEmpty().ifEmpty { tag?.name ?: "Ziel ${index + 1}" }
-                val created = obj.long("created_at", "createdAt")
+                val created = obj.long("created_at", "createdAt")?.takeIf { it > 0 }
+                val ended = obj.long("end_date", "endDate")?.takeIf { it > 0 }
                 val goalId = id("goal", sourceId)
 
-                // ANNAHME: repeat_type 1 = taeglich, 2 = x-mal pro Woche (repeat_value = Anzahl), 3 = monatlich.
+                // Belegt: repeat_type 1 = ausgewaehlte Wochentage, repeat_value als Maske aus sieben Bits
+                // (Bit 0 = Sonntag, Bit 1 = Montag ... Bit 6 = Samstag; 127 = jeden Tag).
+                // repeat_type 2 = repeat_value-mal pro Woche, 3 = repeat_value-mal pro Monat.
                 val repeatType = obj.long("repeat_type", "repeatType") ?: 1L
                 val repeatValue = obj.long("repeat_value", "repeatValue") ?: 0L
-                repeatTypes.add(repeatType)
                 var repeat = GoalRepeat.DAILY
                 var times = 1
+                var weekdays = emptyList<Int>()
                 when (repeatType) {
+                    1L -> {
+                        val mask = (repeatValue and 127L).toInt()
+                        // Maske 0 oder fehlend (andere Schreibweise): jeden Tag.
+                        if (mask in 1..126) {
+                            repeat = GoalRepeat.WEEKDAYS
+                            // Umrechnung auf ISO-Wochentage: Montag = 1 ... Sonntag = 7.
+                            weekdays = (0..6).filter { mask and (1 shl it) != 0 }.map { if (it == 0) 7 else it }.sorted()
+                        }
+                    }
                     2L -> { repeat = GoalRepeat.TIMES_PER_WEEK; times = repeatValue.coerceIn(1, 7).toInt() }
+                    // ANNAHME: monatliche Ziele gibt es hier nicht; als "einmal pro Woche" uebernommen.
                     3L -> { repeat = GoalRepeat.TIMES_PER_WEEK; times = 1; monthly++ }
-                    // Bei taeglichen Zielen koennte repeat_value eine Wochentagsauswahl sein; die Kodierung ist unbekannt.
-                    else -> if (repeatValue in 1..126) weekdayMask++
+                    // ANNAHME: unbekannte Arten gelten als taeglich.
+                    else -> unknownRepeat.add(repeatType)
                 }
 
                 val reminderOn = obj.bool("reminder_enabled", "reminderEnabled") ?: false
@@ -863,23 +1055,25 @@ object DaylioBackup {
                     colorIndex = tag?.colorIndex ?: tag?.groupId?.let { groupColors[it] } ?: 0,
                     repeat = repeat,
                     timesPerWeek = times,
+                    weekdays = weekdays,
                     reminderMinuteOfDay = if (reminderOn) reminder else null,
-                    startDate = created?.let { utcDate(it) } ?: "",
+                    startDate = created?.let { localDateOf(it) } ?: "",
+                    endDate = ended?.let { localDateOf(it) },
                     note = NoteHtml.toPlainText(obj.string("note").orEmpty()),
                     sortOrder = obj.int(*ORDER_KEYS) ?: index,
                     archivedAt = archived(obj),
                     updatedAt = now,
                 )
-                obj.element("id_icon", "icon_id", "icon")
+                // Symbol- und Figurennummern des Vorbilds und seine Herausforderungen haben hier keine Entsprechung.
+                obj.element("id_icon", "icon_id", "icon", "id_avatar", "id_challenge")
                 goalIds[sourceId] = goalId
                 if (created != null) createdDates[goalId] = goal.startDate
                 goals.add(goal)
             }
             if (noId > 0) warnings.add("$noId Ziele ohne Kennung wurden übersprungen.")
-            if (goals.isNotEmpty()) {
-                warnings.add("Ziele: Wiederholung aus „repeat_type“ (Werte: ${repeatTypes.joinToString()}) gelesen. Angenommen: 1 = täglich, 2 = mehrmals pro Woche, 3 = monatlich.")
+            if (unknownRepeat.isNotEmpty()) {
+                warnings.add("Ziele: Die Wiederholungsart ${unknownRepeat.joinToString()} („repeat_type“) ist nicht bekannt. Diese Ziele wurden als täglich übernommen, bitte prüfen.")
             }
-            if (weekdayMask > 0) warnings.add("$weekdayMask tägliche Ziele haben möglicherweise eine Auswahl von Wochentagen. Sie wurde nicht übernommen, bitte prüfen.")
             if (monthly > 0) warnings.add("$monthly monatliche Ziele wurden als „einmal pro Woche“ übernommen, weil es monatliche Ziele hier nicht gibt.")
 
             // --- abgehakte Tage ---
@@ -889,7 +1083,7 @@ object DaylioBackup {
             var badDate = 0
             var duplicates = 0
             for (obj in checkObjs) {
-                obj.element("id", "hour", "minute")
+                obj.element("id", "hour", "minute", "second")
                 val goalId = obj.long("goalId", "goal_id", "id_goal")?.let { goalIds[it] }
                 if (goalId == null) { unknownGoal++; continue }
                 val year = obj.int("year")
@@ -911,10 +1105,13 @@ object DaylioBackup {
             if (duplicates > 0) warnings.add("$duplicates abgehakte Tage waren doppelt und wurden zusammengefasst.")
 
             // Startdatum: der Anlagetag, aber nie nach dem ersten abgehakten Tag (und nie leer).
-            val firstCheck = checks.values.groupBy { it.goalId }.mapValues { (_, list) -> list.minOf { it.date } }
+            // Enddatum entsprechend nie vor dem letzten abgehakten Tag.
+            val byGoal = checks.values.groupBy { it.goalId }
             val fixed = goals.map { goal ->
-                val candidates = listOfNotNull(createdDates[goal.id], firstCheck[goal.id])
-                goal.copy(startDate = candidates.minOrNull() ?: utcDate(now))
+                val dates = byGoal[goal.id].orEmpty().map { it.date }
+                val start = listOfNotNull(createdDates[goal.id], dates.minOrNull()).minOrNull() ?: utcDate(now)
+                val end = goal.endDate?.let { end -> maxOf(end, dates.maxOrNull() ?: end, start) }
+                goal.copy(startDate = start, endDate = end)
             }
             return fixed to checks.values.toList()
         }
@@ -939,9 +1136,10 @@ object DaylioBackup {
         }
 
         /**
-         * Monatszaehlung in goalEntries ist nicht belegt (vermutlich ab 1) und wird deshalb
-         * an den Daten bestimmt: kommt Monat 0 vor, zaehlt er ab 0; kommt 12 vor, ab 1;
-         * sonst entscheidet der Vergleich mit createdAt; ohne Anhaltspunkt gilt ab 1.
+         * In goalEntries zaehlt der Monat ab 1 (belegt; in dayEntries dagegen ab 0). Zur Sicherheit
+         * wird das an den Daten gegengeprueft: kommt Monat 0 vor, zaehlt er ab 0; kommt 12 vor,
+         * ab 1; sonst entscheidet der Vergleich mit createdAt. Ein Hinweis erscheint nur, wenn
+         * die Daten dem belegten Aufbau widersprechen.
          */
         private fun goalMonthBase(checks: List<Obj>): Int {
             if (checks.isEmpty()) return 1
@@ -963,13 +1161,21 @@ object DaylioBackup {
                 hasTwelve -> 1 to "Monat 12 kommt vor"
                 asZero > asOne -> 0 to "Vergleich mit dem Zeitpunkt des Abhakens"
                 asOne > asZero -> 1 to "Vergleich mit dem Zeitpunkt des Abhakens"
-                else -> 1 to "kein Anhaltspunkt in den Daten, Vermutung laut Beschreibung"
+                else -> 1 to ""
             }
-            warnings.add("Abgehakte Tage: Der Monat wurde als „ab $base gezählt“ gelesen ($reason).")
+            if (base != 1 || (hasZero && hasTwelve)) {
+                warnings.add("Abgehakte Tage: Der Monat wurde abweichend vom bekannten Aufbau als „ab $base gezählt“ gelesen ($reason).")
+            }
             return base
         }
 
-        // -------------------------------------------------- Wichtige Tage (Aufbau nicht belegt, daher Heuristik)
+        // -------------------------------------------------- Wichtige Tage
+
+        /**
+         * Belegter Aufbau: {id, name, note, day, month (ab 1), year, categoryId, assetId, isAnniversary,
+         * remindersValue, ...}. Nicht belegt ist die Bedeutung der Kategorie-Nummern und der Kennzahlen
+         * in remindersValue (Text wie "2,4,3,1"); beides wird deshalb nicht uebernommen.
+         */
 
         fun readMilestones(): List<ImportantDay> {
             val objs = list("milestones")
@@ -991,9 +1197,14 @@ object DaylioBackup {
             var noId = 0
             var badDate = 0
             var numericCategory = 0
+            var codedReminders = 0
+            var otherShape = 0
             objs.forEachIndexed { index, obj ->
                 val sourceId = obj.long("id")
                 if (sourceId == null) { noId++; return@forEachIndexed }
+                if (listOf("isAnniversary", "remindersValue", "categoryId").none { it in obj.json }) otherShape++
+                // Ohne Entsprechung hier: Anlagezeit, Vorlagen und Zustand des Vorbilds, Kennzeichen fuer ein eigenes Foto.
+                obj.element("createdAt", "createdAtOffset", "predefinedMilestoneId", "hasCustomPhoto", "stateValue")
                 // Monat zaehlt hier ab 1 (belegt). Ohne Einzelfelder: Zeitstempel.
                 val year = obj.int("year")
                 val month = obj.int("month")
@@ -1007,17 +1218,20 @@ object DaylioBackup {
                 }
                 if (date == null) { badDate++; return@forEachIndexed }
 
-                val categoryRaw = obj.element("category", "category_name", "id_category", "category_id", "categoryId", "id_milestone_category")
+                // ANNAHME: Die Namen zu den Kategorie-Nummern stehen nicht im Backup; die Kategorie bleibt dann leer.
+                val categoryRaw = obj.element("categoryId", "category", "category_name", "id_category", "category_id", "id_milestone_category")
                 val category = when {
                     categoryRaw is JsonPrimitive && categoryRaw.isString && categoryRaw.content.toLongOrNull() == null -> categoryRaw.content.trim()
                     else -> categoryRaw.asLong()?.let { categoryNames[it] ?: run { numericCategory++; "" } }.orEmpty()
                 }
 
-                // ANNAHME: das Foto steht als Verweis auf einen Eintrag der Liste assets.
-                val assetSource = obj.long("id_asset", "asset_id", "assetId", "id_photo", "photo_id", "photo")
+                // Belegt: assetId verweist auf einen Eintrag der Liste assets.
+                val assetSource = obj.long("assetId", "id_asset", "asset_id", "id_photo", "photo_id", "photo")
                     ?: obj.array("assets", "photos")?.firstNotNullOfOrNull { it.asLong() ?: (it as? JsonObject)?.get("id").asLong() }
 
-                // ANNAHME: Erinnerungen als Liste von Tagen vorher (0 = am Tag selbst) oder als Ja/Nein-Felder.
+                // ANNAHME: Die Kennzahlen in remindersValue sind nicht entschluesselt; die Erinnerungen bleiben aus.
+                if (obj.string("remindersValue")?.any { it.isDigit() } == true) codedReminders++
+                // ANNAHME (anderer Aufbau): Erinnerungen als Liste von Tagen vorher (0 = am Tag selbst) oder als Ja/Nein-Felder.
                 val daysBefore = sortedSetOf<Int>()
                 var onDay = obj.bool("remind_on_day", "reminder_on_day", "is_reminder_enabled", "reminder_enabled", "remindOnDay") ?: false
                 val reminderList = obj.array("reminders", "reminder_days", "remind_days_before", "reminderDays")
@@ -1040,8 +1254,8 @@ object DaylioBackup {
                         category = category,
                         note = NoteHtml.toPlainText(obj.string("note", "description").orEmpty()),
                         assetId = assetSource?.let { assetIds[it] },
-                        // ANNAHME: ohne erkennbares Feld wiederholt sich der Tag jaehrlich.
-                        yearly = obj.bool("is_yearly", "yearly", "is_anniversary", "is_repeating", "repeat_yearly", "isYearly") ?: true,
+                        // Belegt: isAnniversary. ANNAHME: ohne erkennbares Feld wiederholt sich der Tag jaehrlich.
+                        yearly = obj.bool("isAnniversary", "is_yearly", "yearly", "is_anniversary", "is_repeating", "repeat_yearly", "isYearly") ?: true,
                         remindOnDay = onDay,
                         remindDaysBefore = daysBefore.toList(),
                         sortOrder = obj.int(*ORDER_KEYS) ?: index,
@@ -1051,8 +1265,9 @@ object DaylioBackup {
             }
             if (noId > 0) warnings.add("$noId wichtige Tage ohne Kennung wurden übersprungen.")
             if (badDate > 0) warnings.add("$badDate wichtige Tage ohne gültiges Datum wurden übersprungen.")
-            if (numericCategory > 0) warnings.add("$numericCategory wichtige Tage haben eine Kategorie-Nummer ohne Namen. Die Kategorie blieb leer.")
-            warnings.add("Wichtige Tage: Der Aufbau im Backup ist nicht sicher bekannt. Datum (Monat ab 1), Kategorie, Foto, Wiederholung und Erinnerungen wurden über naheliegende Feldnamen gelesen. Bitte prüfen.")
+            if (numericCategory > 0) warnings.add("$numericCategory wichtige Tage tragen im Backup nur eine Kategorie-Nummer ohne Namen. Die Kategorie bleibt leer und lässt sich hier neu wählen.")
+            if (codedReminders > 0) warnings.add("$codedReminders wichtige Tage haben Erinnerungen in einer Form, die sich nicht sicher lesen lässt. Die Erinnerungen sind aus und lassen sich hier neu einstellen.")
+            if (otherShape > 0) warnings.add("Wichtige Tage: Bei $otherShape Tagen weicht der Aufbau vom bekannten Backup ab. Kategorie, Foto, Wiederholung und Erinnerungen wurden über naheliegende Feldnamen gelesen. Bitte prüfen.")
             return result
         }
 
@@ -1085,7 +1300,7 @@ object DaylioBackup {
                     id = id("reminder", sourceId),
                     minuteOfDay = ((obj.int("hour") ?: 20).coerceIn(0, 23)) * 60 + (obj.int("minute") ?: 0).coerceIn(0, 59),
                     text = if (custom) text else "",
-                    // ANNAHME: state 0 = aktiv.
+                    // ANNAHME: state 0 = aktiv (im geprueften Backup kam nur 0 vor).
                     active = (obj.long("state") ?: 0L) == 0L,
                     updatedAt = now,
                 )
@@ -1094,23 +1309,35 @@ object DaylioBackup {
             return result
         }
 
-        /** Nur Wochenanfang, Mitternachtsregel und eigene Farben, und nur wo sicher erkennbar. */
+        /**
+         * Belegt: FIRST_DAY_OF_THE_WEEK (Wochentag wie java.util.Calendar: 1 = Sonntag, 2 = Montag),
+         * ARE_QUOTES_ENABLED, ARE_MEMORIES_VISIBLE_TO_USER, WEEKLY_/MONTHLY_REPORT_NOTIFICATION_ENABLED
+         * und die fuenf CUSTOM_COLOR_* (Farbnummern der Quell-Palette). Alles andere nur, wo es sicher erkennbar ist.
+         */
         fun readPrefs(): UserSettings {
             var settings = UserSettings()
             val unclear = sortedSetOf<String>()
+            val moodColors = HashMap<String, Long>()
+            val reports = ArrayList<Boolean>()
             for (obj in list("prefs")) {
                 obj.element("pref_name")
                 val key = obj.string("key") ?: continue
                 val upper = key.uppercase()
                 val value = obj.element("value") ?: continue
                 when {
-                    // ANNAHME: Wochenanfang als Java-Wochentag (1 = Sonntag, 2 = Montag ... 7 = Samstag).
+                    upper in MOOD_COLOR_PREFS -> value.asLong()?.let { moodColors[upper] = it } ?: unclear.add(key)
+                    upper in IGNORED_COLOR_PREFS -> Unit
+                    upper == "ARE_QUOTES_ENABLED" -> value.asBool()?.let { settings = settings.copy(showQuote = it) }
+                    upper == "ARE_MEMORIES_VISIBLE_TO_USER" -> value.asBool()?.let { settings = settings.copy(showMemories = it) }
+                    upper == "WEEKLY_REPORT_NOTIFICATION_ENABLED" || upper == "MONTHLY_REPORT_NOTIFICATION_ENABLED" ->
+                        value.asBool()?.let { reports.add(it) }
                     "WEEK" in upper && ("FIRST" in upper || "START" in upper) -> {
                         val v = value.asLong()
                         if (v != null && v in 1..7) settings = settings.copy(weekStart = ((v + 5) % 7 + 1).toInt()) else unclear.add(key)
                     }
                     "MIDNIGHT" in upper -> {
-                        // Nur eindeutige Textwerte; Zahlen und Ja/Nein sind ohne Kenntnis der Bedeutung nicht sicher.
+                        // ANNAHME: Nur eindeutige Textwerte werden uebernommen. Belegt ist ENTRIES_AFTER_MIDNIGHT
+                        // als Zahl, deren Bedeutung nicht bekannt ist; dann bleibt es bei der Voreinstellung.
                         val text = (value as? JsonPrimitive)?.content?.lowercase().orEmpty()
                         val rule = when {
                             "ask" in text -> MidnightRule.ASK
@@ -1120,14 +1347,24 @@ object DaylioBackup {
                         }
                         if (rule != null) settings = settings.copy(midnightRule = rule) else unclear.add(key)
                     }
+                    upper.startsWith("PALETTE_REV") -> Unit
                     "COLOR" in upper || "COLOUR" in upper -> {
+                        // ANNAHME (anderer Aufbau): fuenf Farbwerte als Liste in einer Einstellung.
                         val colors = parseColors(value)
                         if (colors != null) settings = settings.copy(customMoodColors = colors, moodScheme = "custom") else unclear.add(key)
                     }
                 }
             }
+            if (reports.isNotEmpty()) settings = settings.copy(reportNotifications = reports.any { it })
+            if (moodColors.size == MOOD_COLOR_PREFS.size) {
+                val colors = MOOD_COLOR_PREFS.map { PALETTE_ARGB_MIRRORS_GROUP_PALETTE[paletteIndex(moodColors.getValue(it))] }
+                settings = settings.copy(customMoodColors = colors, moodScheme = "custom")
+            } else if (moodColors.isNotEmpty()) {
+                // Nur ein Teil der fuenf Stufen hat eine eigene Farbe: nicht uebernehmen.
+                unclear.addAll(moodColors.keys)
+            }
             if (unclear.isNotEmpty()) {
-                warnings.add("Einstellungen: Diese Angaben wurden gefunden, aber nicht sicher verstanden und deshalb nicht übernommen: ${unclear.joinToString()}.")
+                warnings.add("Einstellungen: Diese Angaben ließen sich nicht sicher lesen und bleiben auf der Voreinstellung: ${unclear.joinToString()}.")
             }
             return if (settings == UserSettings()) settings else settings.copy(updatedAt = now)
         }
@@ -1162,6 +1399,8 @@ object DaylioBackup {
             }
             for ((key, value) in root) {
                 if (key in TOP_LEVEL_HANDLED || key in TOP_LEVEL_IGNORED || key in consumedTopLevel) continue
+                // tag_colors ist im geprueften Backup eine leere Liste; nur mit Inhalt waere sie einen Hinweis wert.
+                if (key == "tag_colors" && value is JsonArray && value.isEmpty()) continue
                 if (value is JsonArray) {
                     val keys = LinkedHashMap<String, String>()
                     for (o in objects(value)) for ((k, v) in o) keys.putIfAbsent(k, typeLabel(v))

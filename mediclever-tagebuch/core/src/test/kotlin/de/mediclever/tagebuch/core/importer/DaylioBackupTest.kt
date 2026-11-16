@@ -1,7 +1,11 @@
 package de.mediclever.tagebuch.core.importer
 
+import de.mediclever.tagebuch.core.model.ChartMode
+import de.mediclever.tagebuch.core.model.GoalRepeat
 import de.mediclever.tagebuch.core.model.MidnightRule
 import de.mediclever.tagebuch.core.model.ScaleType
+import de.mediclever.tagebuch.core.model.Trend
+import de.mediclever.tagebuch.core.model.UserSettings
 import java.io.File
 import java.nio.file.Files
 import java.util.Base64
@@ -131,6 +135,73 @@ class DaylioBackupTest {
         assertFalse("achievements" in text || "goalSuccessWeeks" in text)
     }
 
+    @Test fun fieldsOfTheRealShapeAreNotReportedAsUnknown() {
+        val result = DaylioBackup.fromJson(
+            """{"version":15,"isReminderOn":true,"daysInRowLongestChain":3,"moodIconsPackId":17,"moodIconsDefaultFreePackId":1,"fontSchemeId":0,"tag_colors":[],
+               "preferredMoodIconsIdsForMoodIdsForIconsPack":{"1":{}},"metadata":{"number_of_entries":1,"platform":"android"},
+               "customMoods":[{"id":9,"custom_name":"","mood_group_id":2,"mood_group_order":0,"icon_id":1712,"predefined_name_id":2,"state":0,"createdAt":0}],
+               "tag_groups":[{"id":1,"name":"G","is_expanded":true,"order":1,"id_predefined":-1,"id_color":39}],
+               "tags":[{"id":1,"name":"T","createdAt":1,"icon":5,"order":1,"state":0,"id_tag_group":1,"id_color":3}],
+               "assets":[{"id":1,"checksum":"abc","type":1,"createdAt":1700000000000,"createdAtOffset":3600000,"android_metadata":"{}"}],
+               "dayEntries":[{"id":1,"minute":13,"hour":23,"day":14,"month":10,"year":2023,"datetime":1700000000000,"timeZoneOffset":3600000,"mood":9,
+                              "tags":[1],"assets":[1],"isFavorite":false,"scaleValues":[],"note":"n","note_title":"t"}],
+               "goalEntries":[{"id":1,"goalId":77,"year":2024,"month":3,"day":1,"hour":8,"minute":0,"second":4,"createdAt":1709280000000}],
+               "goals":[{"id":80,"goal_id":77,"created_at":1700000000000,"reminder_enabled":false,"reminder_minute":0,"reminder_hour":9,"state":0,
+                         "repeat_type":2,"repeat_value":2,"id_tag":1,"end_date":-1,"id_challenge":-1,"id_icon":-1,"id_avatar":7,"order":1}],
+               "goalSuccessWeeks":[{"goal_id":77,"year":2024,"week":9,"create_at_year":2024,"create_at_month":3,"create_at_day":1}],
+               "reminders":[{"id":3,"hour":13,"minute":0,"state":0,"custom_text":"Text","custom_text_enabled":true}],
+               "writingTemplates":[{"id":1,"order":1,"predefined_template_id":2,"title":"V","body":"b"}],
+               "achievements":[{"name":"AC_X","AC_X_SEEN":true}]}""",
+            listOf("assets/photos/2023/11/abc"), now,
+        )
+        assertEquals(1, result.preview.entries)
+        assertTrue(result.warnings.isEmpty(), result.warnings.toString())
+        assertEquals(1, result.diary.goalChecks.size)
+        assertEquals("Text", result.diary.reminders.single().text)
+        assertEquals("T", result.diary.goals.single().name)
+        // Eine gefuellte Liste tag_colors waere dagegen neu und wird genannt.
+        val filled = import(""""tag_colors":[{"id":1,"wert":2}]""")
+        assertTrue(filled.warnings.single().startsWith("Unbekannte Liste „tag_colors“ mit 1 Einträgen"), filled.warnings.toString())
+    }
+
+    @Test fun dataFileWithoutArchive() {
+        val json = """{$moods,"assets":[{"id":1,"checksum":"aaa","createdAt":1700000000000},{"id":2,"checksum":"bbb"}],
+            "dayEntries":[${entry(1).replace("\"assets\":[]", "\"assets\":[1,2]")}]}"""
+        val encoded = Base64.getEncoder().encode(json.toByteArray())
+        val result = DaylioBackup.readData(encoded, now)
+        assertEquals(1, result.preview.entries)
+        assertEquals(2, result.preview.assets)
+        assertEquals(2, result.preview.assetLinks)
+        assertTrue(result.assetFiles.isEmpty())
+        assertEquals(
+            listOf("Es wurde nur die Datendatei ohne das Archiv geöffnet. Die 2 Fotos und Sprachnotizen des Backups fehlen deshalb; sie stecken nur in der vollständigen Sicherungsdatei."),
+            result.warnings,
+        )
+        // Gleiche Kennungen wie beim Lesen aus dem Archiv: ein spaeterer Import des ganzen Archivs legt nichts doppelt an.
+        assertEquals(DaylioBackup.fromJson(json, emptyList(), now).diary.entries, result.diary.entries)
+
+        val file = Files.createTempFile("backup", ".daylio").toFile()
+        try {
+            file.writeBytes(encoded)
+            assertEquals(result, DaylioBackup.readDataFile(file, now))
+            assertFalse(DaylioBackup.looksLikeZip(file))
+            // Ohne Fotos im Backup: trotzdem ein Hinweis, dass nur die Datendatei vorlag.
+            file.writeBytes(Base64.getEncoder().encode("{$moods}".toByteArray()))
+            assertTrue("nur die Datendatei" in DaylioBackup.readDataFile(file, now).warnings.single())
+            file.writeText("%%% kein base64 %%%")
+            assertFailsWith<ImportException> { DaylioBackup.readDataFile(file, now) }
+        } finally {
+            file.delete()
+        }
+        val archive = zip("backup.daylio" to encoded)
+        try {
+            assertTrue(DaylioBackup.looksLikeZip(archive))
+            assertTrue("Archiv" in assertFailsWith<ImportException> { DaylioBackup.readDataFile(archive, now) }.message!!)
+        } finally {
+            archive.delete()
+        }
+    }
+
     // ---------------------------------------------------------------- Ziele
 
     private fun goalImport(checks: String) = import(
@@ -138,29 +209,31 @@ class DaylioBackupTest {
     )
 
     @Test fun goalMonthBaseIsDetected() {
-        // Monat 0 kommt vor -> ab 0 gezaehlt.
-        val zero = goalImport("""{"id":1,"goalId":1,"day":5,"month":0,"year":2024},{"id":2,"goalId":1,"day":6,"month":11,"year":2024}""")
-        assertEquals(listOf("2024-01-05", "2024-12-06"), zero.diary.goalChecks.map { it.date })
-        assertTrue(zero.warnings.any { "ab 0 gezählt" in it && "Monat 0 kommt vor" in it })
+        fun monthNote(r: ImportResult) = r.warnings.filter { it.startsWith("Abgehakte Tage: Der Monat") }
 
-        // Monat 12 kommt vor -> ab 1 gezaehlt.
+        // Belegter Aufbau: ab 1 gezaehlt, ohne Hinweis. Monat 12 bleibt Dezember.
         val twelve = goalImport("""{"id":1,"goalId":1,"day":5,"month":12,"year":2024},{"id":2,"goalId":1,"day":6,"month":1,"year":2024}""")
         assertEquals(listOf("2024-12-05", "2024-01-06"), twelve.diary.goalChecks.map { it.date })
-        assertTrue(twelve.warnings.any { "ab 1 gezählt" in it && "Monat 12 kommt vor" in it })
+        assertTrue(monthNote(twelve).isEmpty(), twelve.warnings.toString())
 
-        // Weder noch: der Zeitpunkt des Abhakens entscheidet. 15.6.2024 12:00 UTC.
         val june = java.time.LocalDateTime.of(2024, 6, 15, 12, 0).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
-        val byStampZero = goalImport("""{"id":1,"goalId":1,"createdAt":$june,"day":15,"month":5,"year":2024}""")
-        assertEquals("2024-06-15", byStampZero.diary.goalChecks.single().date)
-        assertTrue(byStampZero.warnings.any { "ab 0 gezählt" in it && "Vergleich" in it })
         val byStampOne = goalImport("""{"id":1,"goalId":1,"createdAt":$june,"day":15,"month":6,"year":2024}""")
         assertEquals("2024-06-15", byStampOne.diary.goalChecks.single().date)
-        assertTrue(byStampOne.warnings.any { "ab 1 gezählt" in it && "Vergleich" in it })
+        assertTrue(monthNote(byStampOne).isEmpty(), byStampOne.warnings.toString())
 
-        // Kein Anhaltspunkt: Vermutung ab 1, mit Hinweis.
-        val unknown = goalImport("""{"id":1,"goalId":1,"day":15,"month":6,"year":2024}""")
-        assertEquals("2024-06-15", unknown.diary.goalChecks.single().date)
-        assertTrue(unknown.warnings.any { "ab 1 gezählt" in it && "kein Anhaltspunkt" in it })
+        val plain = goalImport("""{"id":1,"goalId":1,"day":15,"month":6,"year":2024}""")
+        assertEquals("2024-06-15", plain.diary.goalChecks.single().date)
+        assertTrue(monthNote(plain).isEmpty(), plain.warnings.toString())
+
+        // Abweichung vom belegten Aufbau wird erkannt und genannt: Monat 0 kommt vor -> ab 0 gezaehlt.
+        val zero = goalImport("""{"id":1,"goalId":1,"day":5,"month":0,"year":2024},{"id":2,"goalId":1,"day":6,"month":11,"year":2024}""")
+        assertEquals(listOf("2024-01-05", "2024-12-06"), zero.diary.goalChecks.map { it.date })
+        assertTrue(monthNote(zero).single().let { "ab 0 gezählt" in it && "Monat 0 kommt vor" in it }, zero.warnings.toString())
+
+        // Weder 0 noch 12: der Zeitpunkt des Abhakens entscheidet. 15.6.2024 12:00 UTC.
+        val byStampZero = goalImport("""{"id":1,"goalId":1,"createdAt":$june,"day":15,"month":5,"year":2024}""")
+        assertEquals("2024-06-15", byStampZero.diary.goalChecks.single().date)
+        assertTrue(monthNote(byStampZero).single().let { "ab 0 gezählt" in it && "Vergleich" in it }, byStampZero.warnings.toString())
     }
 
     @Test fun goalChecksAreUniquePerDayAndStartDateIsNotAfterFirstCheck() {
@@ -179,10 +252,85 @@ class DaylioBackupTest {
 
     @Test fun goalEntriesMayPointToIdOrGoalId() {
         val json = """"goals":[{"id":1,"goal_id":50,"name":"A"},{"id":2,"goal_id":51,"name":"B"}],"goalEntries":[{"goalId":%s,"day":1,"month":12,"year":2024}]"""
+        // Belegt: der Verweis meint goal_id. Kein Hinweis.
         val viaGoalId = import(json.format("51"))
         assertEquals("B", viaGoalId.diary.goals.single { it.id == viaGoalId.diary.goalChecks.single().goalId }.name)
+        assertEquals(DaylioBackup.deterministicId("goal", "51"), viaGoalId.diary.goalChecks.single().goalId)
+        assertTrue(viaGoalId.warnings.none { it.startsWith("Ziele:") }, viaGoalId.warnings.toString())
+        // Abweichend: der Verweis passt nur zu id. Das wird genannt.
         val viaId = import(json.format("2"))
         assertEquals("B", viaId.diary.goals.single { it.id == viaId.diary.goalChecks.single().goalId }.name)
+        assertTrue(viaId.warnings.any { it.startsWith("Ziele:") && "„id“" in it }, viaId.warnings.toString())
+    }
+
+    @Test fun goalIdWinsWhereIdAndGoalIdOverlap() {
+        // Wie im echten Backup: die Kennung 35 ist zugleich id des einen und goal_id des anderen Ziels.
+        val result = import(
+            """"goals":[{"id":35,"goal_id":32,"name":"A"},{"id":40,"goal_id":35,"name":"B"}],
+               "goalEntries":[{"id":1,"goalId":35,"day":1,"month":3,"year":2024,"hour":8,"minute":0,"second":4},
+                              {"id":2,"goalId":32,"day":2,"month":3,"year":2024,"hour":8,"minute":0,"second":4}]""",
+        )
+        val names = result.diary.goals.associate { it.id to it.name }
+        assertEquals(mapOf("2024-03-01" to "B", "2024-03-02" to "A"), result.diary.goalChecks.associate { it.date to names.getValue(it.goalId) })
+        assertTrue(result.warnings.isEmpty(), result.warnings.toString())
+    }
+
+    @Test fun goalRepeatWeekdayMaskWeeklyAndMonthly() {
+        fun goal(id: Int, type: Int, value: Int, extra: String = "") =
+            """{"id":$id,"goal_id":${id + 100},"created_at":1690000000000,"reminder_enabled":false,"reminder_minute":0,"reminder_hour":9,"state":0,
+                "repeat_type":$type,"repeat_value":$value,"id_tag":-1,"end_date":-1,"id_challenge":-1,"id_icon":-1,"id_avatar":7,"order":$id,"name":"Ziel $id"$extra}"""
+        val result = import(
+            """"goals":[${goal(1, 1, 127)},${goal(2, 1, 1)},${goal(3, 1, 2)},${goal(4, 1, 64)},${goal(5, 1, 65)},${goal(6, 1, 62)},
+                        ${goal(7, 2, 4)},${goal(8, 3, 2)},${goal(9, 2, 99)},${goal(10, 7, 1)},${goal(11, 1, 0)}]""",
+        )
+        val g = result.diary.goals
+        assertEquals(GoalRepeat.DAILY, g[0].repeat)
+        assertTrue(g[0].weekdays.isEmpty())
+        // Bit 0 = Sonntag, Bit 1 = Montag ... Bit 6 = Samstag; hier ISO: Montag = 1 ... Sonntag = 7.
+        assertEquals(listOf(listOf(7), listOf(1), listOf(6), listOf(6, 7), listOf(1, 2, 3, 4, 5)), g.subList(1, 6).map { it.weekdays })
+        assertTrue(g.subList(1, 6).all { it.repeat == GoalRepeat.WEEKDAYS })
+        assertEquals(GoalRepeat.TIMES_PER_WEEK to 4, g[6].repeat to g[6].timesPerWeek)
+        assertEquals(GoalRepeat.TIMES_PER_WEEK to 1, g[7].repeat to g[7].timesPerWeek)
+        assertEquals(7, g[8].timesPerWeek)
+        assertEquals(GoalRepeat.DAILY, g[9].repeat)
+        assertEquals(GoalRepeat.DAILY, g[10].repeat)
+        assertEquals(
+            listOf(
+                "Ziele: Die Wiederholungsart 7 („repeat_type“) ist nicht bekannt. Diese Ziele wurden als täglich übernommen, bitte prüfen.",
+                "1 monatliche Ziele wurden als „einmal pro Woche“ übernommen, weil es monatliche Ziele hier nicht gibt.",
+            ),
+            result.warnings,
+        )
+    }
+
+    @Test fun goalNameReminderAndDatesInRealShape() {
+        // Eintraege liefern den Zeitzonen-Versatz: created_at ist Mitternacht Ortszeit (+2 h), in UTC der Vortag.
+        val created = java.time.LocalDateTime.of(2024, 6, 30, 22, 0).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        val ended = java.time.LocalDateTime.of(2024, 8, 10, 22, 30).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        val entryAt = java.time.LocalDateTime.of(2024, 7, 3, 10, 0).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        val result = import(
+            """"tags":[{"id":4,"name":"Lesen ","icon":1,"order":1,"state":0,"id_tag_group":0,"createdAt":5}],
+               "dayEntries":[{"id":1,"datetime":$entryAt,"timeZoneOffset":7200000,"mood":1,"tags":[],"assets":[],"isFavorite":false,"scaleValues":[]}],
+               "goals":[
+                 {"id":7,"goal_id":3,"created_at":$created,"note":"Zehn Seiten","reminder_enabled":true,"reminder_minute":30,"reminder_hour":21,"state":0,
+                  "repeat_type":1,"repeat_value":127,"id_tag":4,"end_date":-1,"id_challenge":-1,"id_icon":-1,"id_avatar":7,"order":1},
+                 {"id":8,"goal_id":4,"created_at":$created,"reminder_enabled":false,"reminder_minute":0,"reminder_hour":9,"state":1,
+                  "repeat_type":2,"repeat_value":2,"id_tag":-1,"end_date":$ended,"id_challenge":1,"name":"Ohne Aktivität","id_icon":28,"id_avatar":7,"order":2}]""",
+        )
+        val (linked, free) = result.diary.goals
+        assertEquals("Lesen", linked.name)
+        assertEquals(result.diary.tags.single().id, linked.tagId)
+        assertEquals(21 * 60 + 30, linked.reminderMinuteOfDay)
+        assertEquals("2024-07-01", linked.startDate)
+        assertNull(linked.endDate)
+        assertNull(linked.archivedAt)
+        assertEquals("Zehn Seiten", linked.note)
+        assertEquals("Ohne Aktivität", free.name)
+        assertNull(free.tagId)
+        assertNull(free.reminderMinuteOfDay, "Uhrzeit steht da, aber reminder_enabled ist falsch")
+        assertEquals("2024-08-11", free.endDate)
+        assertEquals(now, free.archivedAt)
+        assertTrue(result.warnings.isEmpty(), result.warnings.toString())
     }
 
     // ---------------------------------------------------------------- Skalen
@@ -240,12 +388,185 @@ class DaylioBackupTest {
 
     // ---------------------------------------------------------------- Einstellungen, wichtige Tage
 
+    @Test fun scalesInRealShape() {
+        fun values(vararg v: String) = entry(1, ""","scaleValues":[${v.joinToString(",")}]""")
+        val result = import(
+            """"tag_groups":[{"id":1,"name":"G","is_expanded":true,"order":1,"id_predefined":-1}],
+               "scales":[
+                 {"id":6,"type":0,"name":"Ruhe ","color":14,"icon_id":3,"order":4,"predefined":-1,"created_at":1,"created_at_offset":3600000,"state":0,
+                  "is_expanded_in_form":false,"is_expanded_in_stats":true,"is_expanded_in_stats_detail":true,"trend":1,
+                  "text_scale":{"id":6,"id_scale":6,"metric":1,"values":[
+                     {"id":26,"id_text_scale":6,"order":1,"name":"wenig"},{"id":44,"id_text_scale":6,"order":2,"name":"mittel "},{"id":28,"id_text_scale":6,"order":3,"name":"viel"}]},
+                  "number_scale":{"id":6,"id_scale":6,"metric":1,"min":1,"max":10,"predefined_unit":1}},
+                 {"id":7,"type":0,"name":"Kraft","color":20,"order":2,"state":1,"trend":2,
+                  "text_scale":{"id":7,"id_scale":7,"metric":1,"values":[
+                     {"id":31,"id_text_scale":7,"order":2,"name":"zwei"},{"id":32,"id_text_scale":7,"order":1,"name":"eins"}]},
+                  "number_scale":{"id":7,"id_scale":7,"metric":2,"min":0,"max":20,"predefined_unit":3}},
+                 {"id":9,"type":2,"name":"Dauer","color":30,"order":3,"created_at":1,"created_at_offset":0,"state":0,
+                  "is_expanded_in_form":true,"is_expanded_in_stats":true,"is_expanded_in_stats_detail":true,"trend":2,
+                  "time_scale":{"id":1,"id_scale":9,"metric":2}}],
+               "dayEntries":[
+                 ${values("""{"id_scale":6,"id_text_scale_value":44}""", """{"id_scale":7,"id_text_scale_value":32}""", """{"id_scale":9,"time_value":360}""")},
+                 ${values("""{"id_scale":9,"time_value":0}""", """{"id_scale":6,"id_text_scale_value":28}""").replace("\"id\":1", "\"id\":2")},
+                 ${values("""{"id_scale":9,"time_value":21600}""").replace("\"id\":1", "\"id\":3")}]""",
+        )
+        val (calm, power, time) = result.diary.scales
+        assertEquals(listOf(ScaleType.TEXT, ScaleType.TEXT, ScaleType.DURATION), result.diary.scales.map { it.type })
+        assertEquals("Ruhe", calm.name)
+        assertEquals(listOf("wenig", "mittel", "viel"), calm.points.map { it.label })
+        assertEquals(listOf(1, 2, 3), calm.points.map { it.position })
+        // Punkte nach order sortiert, auch wenn sie anders in der Liste stehen.
+        assertEquals(listOf("eins", "zwei"), power.points.map { it.label })
+        // Text: 1 bis Anzahl der Punkte (nicht die Grenzen aus number_scale), Durchschnitt je Tag.
+        assertEquals(listOf(1, 3, 1), listOf(calm.min, calm.max, calm.step))
+        assertEquals(listOf(1, 2), listOf(power.min, power.max))
+        assertEquals(ChartMode.DAILY_AVERAGE, calm.chartMode)
+        // Zeit: ab 0 in Viertelstunden, Summe je Tag. Obergrenze ist ein Tag, ausser ein Wert liegt darueber.
+        assertEquals(listOf(0, 21600, 15), listOf(time.min, time.max, time.step))
+        assertEquals(ChartMode.DAILY_SUM, time.chartMode)
+        // trend 1 = niedriger ist besser, 2 = hoeher ist besser.
+        assertEquals(listOf(Trend.LOWER_IS_BETTER, Trend.HIGHER_IS_BETTER, Trend.HIGHER_IS_BETTER), result.diary.scales.map { it.trend })
+        assertEquals(listOf(14, 15, 16), result.diary.scales.map { it.colorIndex })
+        assertEquals(listOf(4, 2, 3), result.diary.scales.map { it.sortOrder })
+        assertEquals(listOf(null, now, null), result.diary.scales.map { it.archivedAt })
+
+        val (first, second, third) = result.diary.entries
+        assertEquals(calm.points[1].id, first.scaleValues.single { it.scaleId == calm.id }.pointId)
+        assertEquals(power.points[0].id, first.scaleValues.single { it.scaleId == power.id }.pointId)
+        // time_value sind Minuten, auch wenn ein Wert wie Sekunden aussieht: nichts wird umgerechnet.
+        assertEquals(360, first.scaleValues.single { it.scaleId == time.id }.minutes)
+        assertEquals(listOf(0, null), second.scaleValues.map { it.minutes })
+        assertEquals(calm.points[2].id, second.scaleValues[1].pointId)
+        assertEquals(21600, third.scaleValues.single().minutes)
+        assertEquals(6, result.diary.entries.sumOf { it.scaleValues.size })
+        assertTrue(result.warnings.isEmpty(), result.warnings.toString())
+    }
+
+    @Test fun unknownTrendAndTypeAreNamed() {
+        val result = import(
+            """"scales":[{"id":1,"type":1,"name":"Zahl","color":3,"order":1,"state":0,"trend":0,
+                          "number_scale":{"id":1,"id_scale":1,"metric":1,"min":2,"max":8,"predefined_unit":1}},
+                         {"id":2,"type":2,"name":"Zeit","color":3,"order":2,"state":0,"trend":5,"time_scale":{"id":1,"id_scale":2,"metric":2}}],
+               "dayEntries":[]""",
+        )
+        val (number, time) = result.diary.scales
+        assertEquals(ScaleType.NUMBER, number.type)
+        assertEquals(2 to 8, number.min to number.max)
+        assertEquals(listOf(Trend.NEUTRAL, Trend.NEUTRAL), listOf(number.trend, time.trend))
+        val text = result.warnings.joinToString("\n")
+        assertTrue("Typ 1 als Zahlenskala angenommen" in text, text)
+        assertTrue("Die Trend-Werte 0, 5 sind nicht bekannt" in text, text)
+    }
+
+    @Test fun repeatedScaleValueInOneEntryIsCounted() {
+        val result = import(
+            """"scales":[{"id":2,"type":2,"name":"Zeit","color":3,"order":2,"state":0,"trend":2,"time_scale":{"id":1,"id_scale":2,"metric":2}}],
+               "dayEntries":[${entry(1, ""","scaleValues":[{"id_scale":2,"time_value":30},{"id_scale":2,"time_value":45},{"id_scale":8,"time_value":45}]""")}]""",
+        )
+        assertEquals(listOf(30), result.diary.entries.single().scaleValues.map { it.minutes })
+        val text = result.warnings.joinToString("\n")
+        assertTrue("1 Skalenwerte waren im selben Eintrag doppelt" in text, text)
+        assertTrue("1 Skalenwerte konnten keiner Skala oder keinem Punkt zugeordnet werden" in text, text)
+    }
+
+    // ---------------------------------------------------------------- Farben
+
+    @Test fun coloursAreMappedFromTheSourcePalette() {
+        val known = mapOf(1 to 17, 3 to 1, 11 to 0, 14 to 14, 20 to 15, 24 to 7, 25 to 6, 30 to 16, 31 to 13, 39 to 12, 40 to 4)
+        val groups = known.keys.mapIndexed { i, c -> """{"id":${i + 1},"name":"G$i","is_expanded":true,"order":${i + 1},"id_predefined":-1,"id_color":$c}""" }
+        val result = import(
+            """"tag_groups":[${groups.joinToString(",")},{"id":50,"name":"Ohne","is_expanded":true,"order":50,"id_predefined":-1}],
+               "tags":[{"id":1,"name":"Erbt","icon":1,"order":1,"state":0,"id_tag_group":1,"createdAt":1},
+                       {"id":2,"name":"Eigene","icon":1,"order":2,"state":0,"id_tag_group":1,"createdAt":1,"id_color":31},
+                       {"id":3,"name":"Null","icon":1,"order":3,"state":0,"id_tag_group":1,"createdAt":1,"id_color":0}]""",
+        )
+        assertEquals(known.values.toList() + 10, result.diary.groups.map { it.colorIndex })
+        assertEquals(listOf(null, 13, null), result.diary.tags.map { it.colorIndex })
+        assertTrue(result.warnings.isEmpty(), result.warnings.toString())
+    }
+
+    @Test fun unknownColoursGetAStableFallbackAndOneWarning() {
+        val result = import(
+            """"tag_groups":[{"id":1,"name":"A","order":1,"id_color":29},{"id":2,"name":"B","order":2,"id_color":47},{"id":3,"name":"C","order":3,"id_color":29}],
+               "tags":[{"id":1,"name":"T","order":1,"state":0,"id_tag_group":1,"id_color":27}],
+               "scales":[{"id":1,"type":2,"name":"S","color":18,"order":4,"state":0,"trend":2,"time_scale":{"id":1,"id_scale":1,"metric":2}}],
+               "prefs":[{"key":"CUSTOM_COLOR_GREAT","pref_name":"default","value":39},{"key":"CUSTOM_COLOR_GOOD","pref_name":"default","value":40},
+                        {"key":"CUSTOM_COLOR_MEH","pref_name":"default","value":2},{"key":"CUSTOM_COLOR_FUGLY","pref_name":"default","value":1},
+                        {"key":"CUSTOM_COLOR_AWFUL","pref_name":"default","value":11}]""",
+        )
+        // Rest bei Teilung durch 18: 29 -> 11, 47 -> 11, 27 -> 9, 18 -> 0, 2 -> 2.
+        assertEquals(listOf(11, 11, 11), result.diary.groups.map { it.colorIndex })
+        assertEquals(9, result.diary.tags.single().colorIndex)
+        assertEquals(0, result.diary.scales.single().colorIndex)
+        assertEquals("FFD9A62E", result.diary.settings.customMoodColors[2])
+        assertEquals(
+            listOf("Farben: Die Farbnummern 2, 18, 27, 29, 47 des Backups sind hier nicht bekannt. Dafür wurde eine Ersatzfarbe vergeben, bitte bei Bedarf anpassen."),
+            result.warnings,
+        )
+    }
+
+    @Test fun paletteMirrorsTheAppPalette() {
+        // Die Werte muessen GroupPalette in Theme.kt der App entsprechen (dort gepflegt).
+        assertEquals(
+            listOf(
+                "FFB9303F", "FFDD7F37", "FFD9A62E", "FF78A94E", "FF2D8A5F", "FF1F7A8C", "FF4F7FC0", "FF6A4C93", "FFB05690",
+                "FF8A6E52", "FF5C6B78", "FF2D323C", "FF7DBE2B", "FF19B5B0", "FFE0558A", "FFA07BE0", "FF2F7BD9", "FFF2C230",
+            ),
+            DaylioBackup.PALETTE_ARGB_MIRRORS_GROUP_PALETTE,
+        )
+    }
+
+    // ---------------------------------------------------------------- Einstellungen, wichtige Tage
+
+    private fun pref(key: String, value: String) = """{"key":"$key","pref_name":"default","value":$value}"""
+
+    @Test fun prefsInRealShape() {
+        val result = import(
+            """"prefs":[${pref("FIRST_DAY_OF_THE_WEEK", "1")},${pref("ARE_QUOTES_ENABLED", "false")},${pref("ARE_MEMORIES_VISIBLE_TO_USER", "false")},
+                        ${pref("WEEKLY_REPORT_NOTIFICATION_ENABLED", "false")},${pref("MONTHLY_REPORT_NOTIFICATION_ENABLED", "false")},
+                        ${pref("CUSTOM_COLOR_GREAT", "39")},${pref("CUSTOM_COLOR_GOOD", "40")},${pref("CUSTOM_COLOR_MEH", "25")},
+                        ${pref("CUSTOM_COLOR_FUGLY", "1")},${pref("CUSTOM_COLOR_AWFUL", "11")},${pref("CUSTOM_COLOR_PRIMARY", "48")},
+                        ${pref("COLOR_PALETTE_CODE", "15")},${pref("COLOR_PALETTE_DEFAULT_CODE", "1")},${pref("COLOR_PALETTE_PREVIOUS_NON_CUSTOM_CODE", "16")},
+                        ${pref("COLOR_MODE", "2")},${pref("COLOR_MODE_SCHEDULED_LIGHT_MODE_START", "28800000")},${pref("palette_rev_14", "true")},
+                        ${pref("PIN_LOCK_STATE", "1")},${pref("ENTRIES_AFTER_MIDNIGHT", "0")}]""",
+        )
+        val s = result.diary.settings
+        assertEquals(7, s.weekStart) // 1 = Sonntag wie java.util.Calendar
+        assertFalse(s.showQuote)
+        assertFalse(s.showMemories)
+        assertFalse(s.reportNotifications)
+        assertEquals("custom", s.moodScheme)
+        // GREAT, GOOD, MEH, FUGLY, AWFUL = Stufe 1 bis 5: Limette, Gruen, Blau, Gelb, Rot.
+        assertEquals(listOf("FF7DBE2B", "FF2D8A5F", "FF4F7FC0", "FFF2C230", "FFB9303F"), s.customMoodColors)
+        assertEquals(MidnightRule.ASK, s.midnightRule)
+        assertEquals(now, s.updatedAt)
+        // Nur die Zahl zur Mitternachtsregel bleibt offen; kein Farbschluessel wird als unverstanden genannt.
+        assertEquals(
+            listOf("Einstellungen: Diese Angaben ließen sich nicht sicher lesen und bleiben auf der Voreinstellung: ENTRIES_AFTER_MIDNIGHT."),
+            result.warnings,
+        )
+
+        assertEquals(1, import(""""prefs":[${pref("FIRST_DAY_OF_THE_WEEK", "2")}]""").diary.settings.weekStart)
+        // Einer der beiden Berichte genuegt.
+        val oneReport = import(""""prefs":[${pref("WEEKLY_REPORT_NOTIFICATION_ENABLED", "false")},${pref("MONTHLY_REPORT_NOTIFICATION_ENABLED", "true")}]""")
+        assertTrue(oneReport.diary.settings.reportNotifications)
+        // Alles wie voreingestellt: die Einstellungen gelten als unveraendert.
+        val defaults = import(""""prefs":[${pref("FIRST_DAY_OF_THE_WEEK", "2")},${pref("ARE_QUOTES_ENABLED", "true")},${pref("COLOR_MODE", "2")}]""")
+        assertEquals(UserSettings(), defaults.diary.settings)
+        assertTrue(defaults.warnings.isEmpty(), defaults.warnings.toString())
+        // Nur ein Teil der fuenf Farben: nichts uebernehmen, aber nennen.
+        val partial = import(""""prefs":[${pref("CUSTOM_COLOR_GREAT", "39")},${pref("CUSTOM_COLOR_AWFUL", "11")}]""")
+        assertEquals("klar", partial.diary.settings.moodScheme)
+        assertTrue(partial.diary.settings.customMoodColors.isEmpty())
+        assertTrue(partial.warnings.single().endsWith("CUSTOM_COLOR_AWFUL, CUSTOM_COLOR_GREAT."), partial.warnings.toString())
+    }
+
     @Test fun prefsOnlyWhereRecognisable() {
         val result = import(
             """"prefs":[{"key":"FIRST_DAY_OF_WEEK","pref_name":"default","value":2},
                         {"key":"PAST_MIDNIGHT_BEHAVIOUR","value":1},
                         {"key":"CUSTOM_MOOD_COLORS","value":"[\"#11aa22\",\"#000000\",\"#FFFFFF\",\"#123456\",\"#abcdef\"]"},
-                        {"key":"COLOR_MODE","value":"dark"},{"key":"PIN","value":"1234"}]""",
+                        {"key":"COLOR_MODE","value":"dark"},{"key":"ACCENT_COLOR","value":"blau"},{"key":"PIN","value":"1234"}]""",
         )
         val s = result.diary.settings
         assertEquals(1, s.weekStart)
@@ -253,14 +574,47 @@ class DaylioBackupTest {
         assertEquals(listOf("FF11AA22", "FF000000", "FFFFFFFF", "FF123456", "FFABCDEF"), s.customMoodColors)
         assertEquals("custom", s.moodScheme)
         val text = result.warnings.joinToString("\n")
-        assertTrue("COLOR_MODE, PAST_MIDNIGHT_BEHAVIOUR" in text, text)
-        assertFalse("1234" in text || "PIN" in text)
+        // Eine Farbangabe, die weder bekannt noch lesbar ist, und die unklare Mitternachtsregel werden genannt.
+        assertTrue("ACCENT_COLOR, PAST_MIDNIGHT_BEHAVIOUR" in text, text)
+        // COLOR_MODE (Hell/Dunkel des Vorbilds) hat hier keine Entsprechung und ist kein Grund fuer einen Hinweis.
+        assertFalse("COLOR_MODE" in text, text)
+        assertFalse("1234" in text || "PIN" in text || "blau" in text)
 
         assertEquals(7, import(""""prefs":[{"key":"WEEK_START","value":"1"}]""").diary.settings.weekStart)
         assertEquals(6, import(""""prefs":[{"key":"first_day_of_week","value":7}]""").diary.settings.weekStart)
         assertEquals(
             MidnightRule.PREVIOUS_DAY,
             import(""""prefs":[{"key":"MIDNIGHT_RULE","value":"PREVIOUS_DAY"}]""").diary.settings.midnightRule,
+        )
+    }
+
+    @Test fun milestonesInRealShape() {
+        fun day(id: Int, date: String, category: Int, asset: Int, yearly: Boolean, reminders: String): String {
+            val (y, m, d) = date.split("-").map { it.toInt() }
+            return """{"id":$id,"createdAt":1710103107877,"createdAtOffset":3600000,"day":$d,"month":$m,"year":$y,"categoryId":$category,
+                "predefinedMilestoneId":0,"name":" Tag $id ","note":"<b>x</b>","assetId":$asset,"hasCustomPhoto":${asset > 0},
+                "isAnniversary":$yearly,"remindersValue":"$reminders","stateValue":0}"""
+        }
+        val result = import(
+            """"assets":[{"id":158,"checksum":"abc","type":1,"createdAt":1700000000000,"createdAtOffset":3600000,"android_metadata":"{}"}],
+               "milestones":[${day(1, "2023-12-29", 0, 158, true, "2,4,3,1")},${day(2, "2022-01-31", 2, 158, false, "2,4")},${day(3, "1995-10-12", 1, -1, true, "")}]""",
+        )
+        val (a, b, c) = result.diary.importantDays
+        assertEquals(listOf("2023-12-29", "2022-01-31", "1995-10-12"), result.diary.importantDays.map { it.date }) // Monat ab 1
+        assertEquals("Tag 1", a.name)
+        assertEquals("x", a.note)
+        assertEquals(listOf(true, false, true), listOf(a.yearly, b.yearly, c.yearly))
+        assertEquals(result.diary.assets.single().id, a.assetId)
+        assertEquals(a.assetId, b.assetId)
+        assertNull(c.assetId)
+        // Kennzahlen und Kategorie-Nummern werden nicht gedeutet.
+        assertTrue(result.diary.importantDays.all { !it.remindOnDay && it.remindDaysBefore.isEmpty() && it.category.isEmpty() })
+        assertEquals(
+            listOf(
+                "3 wichtige Tage tragen im Backup nur eine Kategorie-Nummer ohne Namen. Die Kategorie bleibt leer und lässt sich hier neu wählen.",
+                "2 wichtige Tage haben Erinnerungen in einer Form, die sich nicht sicher lesen lässt. Die Erinnerungen sind aus und lassen sich hier neu einstellen.",
+            ),
+            result.warnings,
         )
     }
 
