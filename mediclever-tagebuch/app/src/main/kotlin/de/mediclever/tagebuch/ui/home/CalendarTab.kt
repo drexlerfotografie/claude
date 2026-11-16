@@ -33,6 +33,8 @@ import de.mediclever.tagebuch.ui.theme.onColor
 import java.time.LocalDate
 import java.time.YearMonth
 
+fun levelName(level: Int): String = listOf("beste Stufe", "gute Stufe", "mittlere Stufe", "schlechte Stufe", "schlechteste Stufe").getOrElse(level - 1) { "" }
+
 /** Monatsraster: jeder Tag in der Farbe seiner Stimmung, leere Tage mit Plus zum Nachtragen. */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +64,7 @@ fun CalendarTab(month: YearMonth) {
                     if (day == null) { Spacer(Modifier.weight(1f).aspectRatio(0.85f)); continue }
                     val c = day.level?.let { colors.level(it) }
                     val dimmed = filtering && day.matchCount == 0
-                    val label = fmtDayShort(day.date) + when { day.entryCount == 0 -> ", kein Eintrag"; else -> ", ${plural(day.entryCount, "Eintrag", "Einträge")}" + (day.level?.let { ", Stufe $it" } ?: "") }
+                    val label = fmtDayShort(day.date) + when { day.entryCount == 0 -> ", kein Eintrag"; else -> ", ${plural(day.entryCount, "Eintrag", "Einträge")}" + (day.level?.let { ", " + levelName(it) } ?: "") }
                     Column(
                         Modifier.weight(1f).aspectRatio(0.85f).clip(RoundedCornerShape(12.dp))
                             .then(if (c != null) Modifier.background(c.copy(alpha = if (dimmed) 0.2f else 1f)) else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)))
@@ -74,7 +76,8 @@ fun CalendarTab(month: YearMonth) {
                         val fg = if (c != null && !dimmed) onColor(c) else MaterialTheme.colorScheme.onSurface
                         Text(day.date.dayOfMonth.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = if (day.isToday) FontWeight.Black else FontWeight.SemiBold, color = fg, modifier = Modifier.alpha(if (day.isFuture) 0.4f else 1f))
                         if (day.entryCount == 0 && !day.isFuture) Icon(Icons.Rounded.Add, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        else if (day.entryCount > 1) Text("${day.entryCount}", style = MaterialTheme.typography.labelSmall, color = fg)
+                        // Symbol der Stufe, damit der Tag nicht nur an der Farbe erkennbar ist
+                        else if (day.level != null) MoodFace(day.level!!, "a", 20.dp, Modifier.alpha(if (dimmed) 0.3f else 1f))
                     }
                 }
             }
@@ -85,6 +88,7 @@ fun CalendarTab(month: YearMonth) {
                 for (l in cal.moodCounter.byLevel) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     MoodFace(l.level, diary.moods.firstOrNull { it.level == l.level }?.icon ?: "a", 34.dp, muted = l.count == 0)
                     Text(l.count.toString(), style = MaterialTheme.typography.titleMedium)
+                    Text(diary.moods.firstOrNull { it.level == l.level }?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
             }
         }

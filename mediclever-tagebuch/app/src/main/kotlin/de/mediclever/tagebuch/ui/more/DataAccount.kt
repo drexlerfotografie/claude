@@ -230,7 +230,7 @@ fun AboutScreen() {
             Text("Das Tagebuch ist eine Hilfe zur Selbstbeobachtung. Es stellt keine Diagnosen und ersetzt keine ärztliche oder therapeutische Beratung.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Panel(title = "Wenn es dir sehr schlecht geht", padding = 14.dp) {
-            Text("Sprich mit jemandem. Die TelefonSeelsorge ist rund um die Uhr kostenlos erreichbar: 0800 111 0 111 oder 0800 111 0 222. In akuter Gefahr wähle den Notruf 112.")
+            Text("Sprich mit jemandem. Die TelefonSeelsorge ist rund um die Uhr kostenlos erreichbar: 0800 111 0 111 oder 0800 111 0 222. In akuter Gefahr wähle den Notruf 112.")
         }
         Panel(title = "Datenschutz in Kürze", padding = 14.dp) {
             Text("• Dein Tagebuch liegt auf diesem Gerät. Nur wenn du dich anmeldest, werden Texte, Stimmungen und Einstellungen zusätzlich bei Google Firebase in der EU gespeichert.\n• Fotos und Sprachnotizen verlassen das Gerät nicht. Aufnahmeort und Gerätedaten werden aus Fotos entfernt.\n• Es gibt keine Werbung und keine Nutzungsanalyse.\n• Benachrichtigungen enthalten nie Inhalte aus deinem Tagebuch.\n• Du kannst alles exportieren und alles löschen.")

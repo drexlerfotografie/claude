@@ -67,7 +67,7 @@ fun SeriesChart(
         Row(Modifier.fillMaxWidth()) {
             points.forEachIndexed { i, p ->
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    if (i % labelEvery == 0) Text(p.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false)
+                    if (i % labelEvery == 0) Text(p.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false, modifier = Modifier.wrapContentWidth(unbounded = true))
                 }
             }
         }

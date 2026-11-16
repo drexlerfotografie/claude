@@ -61,7 +61,11 @@ class AssetStore(private val root: File) {
         val orientation = runCatching {
             ExifInterface(bytes.inputStream()).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-        val taken = runCatching { ExifInterface(bytes.inputStream()).dateTimeOriginal }.getOrNull() ?: now
+        val taken = runCatching {
+            ExifInterface(bytes.inputStream()).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)?.let { text ->
+                java.time.LocalDateTime.parse(text, java.time.format.DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss")).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+        }.getOrNull() ?: now
         val m = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> m.postRotate(90f)

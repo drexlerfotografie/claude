@@ -15,7 +15,7 @@ object StarterPacks {
         Pack("leer", "Leer starten", "Nur die fünf Stimmungen. Du legst alles selbst an."),
     )
 
-    fun defaultMoods(): List<Mood> = listOf("Super", "Gut", "Okay", "Schlecht", "Mies")
+    fun defaultMoods(): List<Mood> = listOf("Sehr gut", "Gut", "Mittel", "Schlecht", "Sehr schlecht")
         .mapIndexed { i, n -> Mood(level = i + 1, name = n, icon = "a") }
 
     private class Builder {

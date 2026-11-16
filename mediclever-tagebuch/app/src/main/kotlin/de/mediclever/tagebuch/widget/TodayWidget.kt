@@ -91,7 +91,10 @@ class TodayWidget : GlanceAppWidget() {
             val fg = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = if (lum > 0.6) 0xFF11202C.toInt() else 0xFFFFFFFF.toInt(); strokeWidth = w * 0.07f; strokeCap = Paint.Cap.ROUND }
             c.drawCircle(w * 0.33f, w * 0.40f, w * 0.055f, fg); c.drawCircle(w * 0.67f, w * 0.40f, w * 0.055f, fg)
             val my = w * 0.66f
-            if (level == 1) c.drawPath(Path().apply { moveTo(w * 0.28f, my - w * 0.05f); quadTo(w * 0.5f, my + w * 0.26f, w * 0.72f, my - w * 0.05f); close() }, fg)
+            if (level == 5) {
+                c.drawPath(Path().apply { moveTo(w * 0.30f, my + w * 0.14f); quadTo(w * 0.5f, my - w * 0.20f, w * 0.70f, my + w * 0.14f); close() }, fg)
+                c.drawLine(w * 0.24f, w * 0.30f, w * 0.40f, w * 0.23f, fg); c.drawLine(w * 0.76f, w * 0.30f, w * 0.60f, w * 0.23f, fg)
+            } else if (level == 1) c.drawPath(Path().apply { moveTo(w * 0.28f, my - w * 0.05f); quadTo(w * 0.5f, my + w * 0.26f, w * 0.72f, my - w * 0.05f); close() }, fg)
             else {
                 val bend = when (level) { 2 -> 0.11f; 3 -> 0f; 4 -> -0.11f; else -> -0.20f } * w
                 val y = my + if (bend < 0) w * 0.06f else 0f

@@ -86,7 +86,7 @@ fun ImportantDayEditScreen(id: String?) {
         if (uri != null) env.act { assets.importPhoto(context, uri, System.currentTimeMillis())?.let { a -> save(a); d = d.copy(assetId = a.id) } }
     }
     val categories = (listOf("Privat", "Familie", "Beruf", "Gesundheit", "Sport") + env.diary.importantDays.map { it.category }).filter { it.isNotBlank() }.distinct()
-    SubScreen(if (existing == null) "Neuer wichtiger Tag" else "Wichtigen Tag bearbeiten", nav.back, actions = {
+    SubScreen(if (existing == null) "Neuer wichtiger Tag" else "Wichtiger Tag", nav.back, actions = {
         if (existing != null) IconButton({ confirmDelete = true }) { Icon(Icons.Rounded.DeleteOutline, "Löschen") }
         TextButton({ env.act { save(d.copy(name = d.name.trim(), category = d.category.trim())) }; nav.back() }, enabled = d.name.isNotBlank()) { Text("Speichern") }
     }) {
@@ -133,7 +133,7 @@ fun RemindersScreen() {
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) { if (Build.VERSION.SDK_INT >= 33 && env.diary.reminders.any { it.active }) permission.launch(Manifest.permission.POST_NOTIFICATIONS) }
     SubScreen("Erinnerungen", nav.back, floating = { ExtendedFloatingActionButton(onClick = { editing = Reminder(minuteOfDay = 20 * 60) }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Neue Erinnerung") }) }) {
-        Text("Die App erinnert dich zu diesen Uhrzeiten ans Eintragen. Hast du an dem Tag schon etwas eingetragen, bleibt die Erinnerung trotzdem freundlich kurz.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Die App erinnert dich zu diesen Uhrzeiten ans Eintragen. Der Hinweis zeigt nie Inhalte aus deinem Tagebuch.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (env.diary.reminders.isEmpty()) EmptyState("Keine Erinnerungen", "Lege eine Uhrzeit fest, zu der du gewöhnlich Zeit für einen Eintrag hast.")
         else RowGroup {
             env.diary.reminders.forEachIndexed { i, r ->

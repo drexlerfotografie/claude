@@ -195,7 +195,7 @@ fun GoalEditScreen(id: String?) {
             ColorPicker(g.colorIndex, { g = g.copy(colorIndex = it) })
         }
         Panel(title = "Wie oft?", padding = 12.dp) {
-            Choice(listOf(GoalRepeat.DAILY to "Täglich", GoalRepeat.TIMES_PER_WEEK to "x-mal pro Woche", GoalRepeat.WEEKDAYS to "Feste Wochentage"), g.repeat) { g = g.copy(repeat = it) }
+            Choice(listOf(GoalRepeat.DAILY to "Täglich", GoalRepeat.TIMES_PER_WEEK to "Mehrmals pro Woche", GoalRepeat.WEEKDAYS to "Feste Wochentage"), g.repeat) { g = g.copy(repeat = it) }
             if (g.repeat == GoalRepeat.TIMES_PER_WEEK) Choice((1..7).map { it to "$it×" }, g.timesPerWeek) { g = g.copy(timesPerWeek = it) }
             if (g.repeat == GoalRepeat.WEEKDAYS) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (w in de.mediclever.tagebuch.core.stats.weekdayOrder(d.settings.weekStart)) FilterChip(w in g.weekdays, { g = g.copy(weekdays = if (w in g.weekdays) g.weekdays - w else (g.weekdays + w).sorted()) }, label = { Text(weekdayShort(w)) }, modifier = Modifier.height(48.dp))

@@ -351,7 +351,11 @@ private fun StepTwo(
 }
 
 /** Hinweis auf die laufende Serie eines Ziels, z. B. "Serie: 4 Tage". */
-var goalSeriesHint: (Diary, Goal, LocalDate) -> String = { _, _, _ -> "" }
+fun goalSeriesHint(diary: Diary, goal: Goal, date: LocalDate): String {
+    val s = de.mediclever.tagebuch.core.goals.goalTracker(diary, goal.id)?.streaks(date) ?: return ""
+    if (s.current == 0) return ""
+    return "Serie: " + if (s.unit == de.mediclever.tagebuch.core.goals.StreakUnit.WEEKS) plural(s.current, "Woche", "Wochen") else plural(s.current, "Tag", "Tage")
+}
 
 private fun lastValueOf(diary: Diary, scaleId: String): ScaleValue? =
     diary.entries.firstNotNullOfOrNull { e -> e.scaleValues.firstOrNull { it.scaleId == scaleId } }
@@ -417,10 +421,16 @@ private fun PointRow(labels: List<String>, selected: Int, color: Color, showAll:
                 }
             }
         }
+        // Beschriftung steht genau unter ihrem Punkt: ohne Auswahl die beiden Enden, sonst der gewaehlte Punkt
         if (!showAll) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(labels.first(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(labels.getOrNull(selected) ?: "", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Text(labels.last(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            labels.forEachIndexed { i, label ->
+                val show = if (selected < 0) i == 0 || i == labels.lastIndex else i == selected
+                Box(Modifier.width(48.dp), contentAlignment = if (i == 0) Alignment.CenterStart else if (i == labels.lastIndex) Alignment.CenterEnd else Alignment.Center) {
+                    if (show) Text(label, maxLines = 1, softWrap = false, modifier = Modifier.wrapContentWidth(if (i == 0) Alignment.Start else if (i == labels.lastIndex) Alignment.End else Alignment.CenterHorizontally, unbounded = true),
+                        style = if (i == selected) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium, fontWeight = if (i == selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (i == selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }

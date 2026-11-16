@@ -69,14 +69,15 @@ fun SearchScreen() {
     SubScreen("Suchen", nav.back, scroll = false) {
         OutlinedTextField(text, { text = it }, placeholder = { Text("Text in Titel oder Notiz") }, singleLine = true, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Rounded.Search, null) },
             trailingIcon = { if (text.isNotEmpty()) IconButton({ text = "" }) { Icon(Icons.Rounded.Close, "Suchtext löschen") } })
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (l in 1..5) FilterChip(l in levels, { levels = if (l in levels) levels - l else levels + l }, label = { MoodFace(l, "a", 26.dp) }, modifier = Modifier.height(48.dp).weight(1f))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (l in 1..5) FilterChip(l in levels, { levels = if (l in levels) levels - l else levels + l }, leadingIcon = { MoodFace(l, "a", 24.dp) },
+                label = { Text(d.moods.firstOrNull { it.level == l }?.name ?: "") }, modifier = Modifier.height(48.dp))
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (id in tagIds) d.tagById[id]?.let { t -> InputChip(true, { tagIds = tagIds - id }, { Text(t.name) }, trailingIcon = { Icon(Icons.Rounded.Close, "Entfernen", Modifier.size(18.dp)) }, modifier = Modifier.heightIn(min = 48.dp)) }
             AssistChip({ pickTag = true }, { Text("Aktivität") }, leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) }, modifier = Modifier.heightIn(min = 48.dp))
         }
-        if (!active) EmptyState("Wonach suchst du?", "Gib einen Text ein oder wähle Stimmung und Aktivität.")
+        if (!active) EmptyState("Wonach suchst du?", "Gib einen Text ein oder wähle eine Stimmung oder Aktivität.")
         else {
             Text(if (hits.isEmpty()) "Keine Treffer" else plural(hits.size, "Treffer", "Treffer"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -175,8 +176,8 @@ fun AchievementsScreen() {
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(a.title, style = MaterialTheme.typography.titleMedium)
-                            Text(a.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (!a.unlocked) { ShareBar(a.progress.toFloat() / a.target.coerceAtLeast(1), MaterialTheme.colorScheme.primary); Text("${a.progress} von ${a.target}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            if (a.unlocked) Text(a.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (!a.unlocked) { ShareBar(a.progress.toFloat() / a.target.coerceAtLeast(1), MaterialTheme.colorScheme.primary); Text("Noch nicht erreicht · ${a.progress} von ${a.target}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             else Text("Erreicht", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -197,8 +198,8 @@ fun ReportsScreen() {
     val r = remember(env.diary, env.today, weekly, back) {
         if (weekly) weeklyReport(env.diary, env.today.minusWeeks(back.toLong()), env.today) else monthlyReport(env.diary, YearMonth.from(env.today).minusMonths(back.toLong()), env.today)
     }
-    @Composable fun change(c: Int, label: String) = Text(if (c == 0) "wie $label" else (if (c > 0) "+$c" else "−${-c}") + " zu $label", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    val prev = if (weekly) "Vorwoche" else "Vormonat"
+    @Composable fun change(c: Int, label: String) = Text(if (c == 0) "unverändert $label" else (if (c > 0) "+$c" else "−${-c}") + " $label", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val prev = if (weekly) "zur Vorwoche" else "zum Vormonat"
     SubScreen("Berichte", nav.back) {
         Choice(listOf(false to "Monat", true to "Woche"), weekly) { weekly = it; back = 1 }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -220,7 +221,7 @@ fun ReportsScreen() {
                     Text("Stimmung", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(r.averageScore.value?.let { String.format(Locale.GERMANY, "%.1f von 5", it) } ?: "–", style = MaterialTheme.typography.headlineSmall)
                     val ch = r.averageScore.change
-                    Text(ch?.let { String.format(Locale.GERMANY, "%+.1f zu $prev", it) } ?: "kein Vergleich", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(ch?.let { String.format(Locale.GERMANY, "%+.1f $prev", it) } ?: "kein Vergleich", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Panel(Modifier.weight(1f), padding = 14.dp) { Text("Wörter", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${r.words.value}", style = MaterialTheme.typography.headlineSmall); change(r.words.change, prev) }
             }

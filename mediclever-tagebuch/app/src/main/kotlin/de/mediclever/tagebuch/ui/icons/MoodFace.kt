@@ -69,7 +69,15 @@ private fun DrawScope.drawFace(level: Int, variant: String, bg: Color, fg: Color
     val my = w * 0.66f
     val half = w * 0.20f
     val bend = when (level) { 1 -> 0.20f; 2 -> 0.11f; 3 -> 0f; 4 -> -0.11f; else -> -0.20f } * w
-    if (level == 1) {
+    if (level == 5) {
+        // offener, nach unten gezogener Mund als gefuellte Form: Gegenstueck zu Stufe 1
+        val p = Path().apply {
+            moveTo(w * 0.30f, my + w * 0.14f)
+            quadraticTo(w * 0.5f, my - w * 0.20f, w * 0.70f, my + w * 0.14f)
+            close()
+        }
+        drawPath(p, fg)
+    } else if (level == 1) {
         // offenes Laecheln als gefuellte Form
         val p = Path().apply {
             moveTo(w * 0.28f, my - w * 0.05f)
@@ -86,7 +94,8 @@ private fun DrawScope.drawFace(level: Int, variant: String, bg: Color, fg: Color
         drawPath(p, fg, style = stroke)
     }
     if (level == 5 && variant != "c") {
-        // Traene als zweites Formmerkmal der schlechtesten Stufe
-        drawCircle(fg, w * 0.035f, Offset(lx - w * 0.02f, eyeY + w * 0.13f))
+        // nach aussen abfallende Brauen als zweites Formmerkmal der schlechtesten Stufe
+        drawLine(fg, Offset(lx - w * 0.09f, eyeY - w * 0.10f), Offset(lx + w * 0.07f, eyeY - w * 0.17f), stroke.width, StrokeCap.Round)
+        drawLine(fg, Offset(rx + w * 0.09f, eyeY - w * 0.10f), Offset(rx - w * 0.07f, eyeY - w * 0.17f), stroke.width, StrokeCap.Round)
     }
 }

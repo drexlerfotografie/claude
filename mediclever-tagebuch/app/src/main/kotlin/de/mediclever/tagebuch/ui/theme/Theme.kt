@@ -101,7 +101,13 @@ data class DiaryColors(
 }
 
 /** Lesbare Schriftfarbe auf einer farbigen Flaeche. */
-fun onColor(bg: Color): Color = if (bg.luminance() > 0.5f) Brand.RichBlack else Color.White
+fun onColor(bg: Color): Color {
+    val l = bg.luminance()
+    val withWhite = 1.05f / (l + 0.05f)
+    val withDark = (l + 0.05f) / (Brand.RichBlack.luminance() + 0.05f)
+    // Weiss nur, wenn es mindestens 4,5:1 erreicht oder klar besser ist als Dunkel
+    return if (withWhite >= 4.5f || withWhite > withDark) Color.White else Brand.RichBlack
+}
 
 val LocalDiaryColors = staticCompositionLocalOf { DiaryColors(MoodScheme.KLAR.colors, false) }
 

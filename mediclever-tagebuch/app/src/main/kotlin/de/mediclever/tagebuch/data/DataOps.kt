@@ -109,7 +109,7 @@ class DataOps(private val context: Context, private val repo: DiaryRepository) {
             if (y > h - margin - 90) newPage()
             val mood = d.moodById[e.moodId]
             block(LocalDate.parse(e.localDate).format(fmt) + " · %d:%02d Uhr".format(e.minuteOfDay / 60, e.minuteOfDay % 60), head, 2f)
-            block("Stimmung: ${mood?.name ?: "unbekannt"}" + (mood?.let { " (Stufe ${it.level} von 5)" } ?: ""), meta, 2f)
+            block("Stimmung: ${mood?.name ?: "unbekannt"}" + "", meta, 2f)
             block(e.tagIds.mapNotNull { d.tagById[it]?.name }.joinToString(", "), meta, 2f)
             block(e.scaleValues.mapNotNull { v -> d.scaleById[v.scaleId]?.let { s -> s.name + ": " + when (s.type) {
                 ScaleType.TEXT -> s.points.firstOrNull { it.id == v.pointId }?.label ?: "–"

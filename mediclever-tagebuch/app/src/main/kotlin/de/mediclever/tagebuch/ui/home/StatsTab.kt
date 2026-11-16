@@ -53,7 +53,7 @@ fun StatsTab(month: YearMonth) {
         Choice(listOf(false to "Monat", true to "Jahr ${month.year}"), yearly) { yearly = it }
 
         // Tage in Folge
-        SharePanel("Tage in Folge") {
+        SharePanel("Tage in Folge bis heute") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(plural(s.streak.current, "Tag", "Tage"), style = MaterialTheme.typography.headlineMedium)
@@ -113,7 +113,7 @@ fun StatsTab(month: YearMonth) {
         // Stimmungszaehler als Halbring
         SharePanel("Stimmungen") {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                RingChart(s.moodCounter.byLevel.map { colors.level(it.level) to it.count.toFloat() }, "Stimmungszähler: " + s.moodCounter.byLevel.joinToString { "Stufe ${it.level}: ${it.count}" }, half = true, size = 220.dp) {
+                RingChart(s.moodCounter.byLevel.map { colors.level(it.level) to it.count.toFloat() }, "Stimmungszähler: " + s.moodCounter.byLevel.joinToString { "${levelName(it.level)}: ${it.count}" }, half = true, size = 220.dp) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(s.moodCounter.total.toString(), style = MaterialTheme.typography.headlineMedium)
                         Text(if (s.moodCounter.total == 1) "Eintrag" else "Einträge", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -124,6 +124,7 @@ fun StatsTab(month: YearMonth) {
                 for (l in s.moodCounter.byLevel) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     MoodFace(l.level, diary.moods.firstOrNull { it.level == l.level }?.icon ?: "a", 34.dp)
                     Text(l.count.toString(), style = MaterialTheme.typography.titleMedium)
+                    Text(diary.moods.firstOrNull { it.level == l.level }?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
             }
             if (s.moodCounter.byMood.size > 5) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

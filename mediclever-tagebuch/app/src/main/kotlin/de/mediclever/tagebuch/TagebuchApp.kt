@@ -42,7 +42,11 @@ class AppContainer(app: Application) {
     }
 
     /** Nur fuer Tests: beendet Hintergrundarbeit und gibt Dateien frei. */
-    fun close() { scope.coroutineContext[kotlinx.coroutines.Job]?.cancel(); db.close() }
+    fun close() {
+        // erst alle Beobachter beenden, dann die Datenbank schliessen
+        kotlinx.coroutines.runBlocking { scope.coroutineContext[kotlinx.coroutines.Job]?.let { it.cancel(); it.join() } }
+        db.close()
+    }
 }
 
 class TagebuchApp : Application() {

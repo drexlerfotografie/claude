@@ -21,4 +21,5 @@ class StatsShots : ShotBase() {
     @Test fun stats() = shot("statistiken") { HomeScreen(startTab = 1, startMonth = YearMonth.of(2026, 10)) }
     @Test fun statsEmpty() = shot("statistiken_leer", Diary(moods = StarterPacks.defaultMoods())) { HomeScreen(startTab = 1) }
     @Test fun calendar() = shot("kalender") { HomeScreen(startTab = 2) }
+    @Test fun calendarWithGaps() = shot("kalender_luecken") { HomeScreen(startTab = 2, startMonth = YearMonth.of(2026, 8)) }
 }

@@ -38,7 +38,7 @@ fun OnboardingScreen(startStep: Int = 0) {
                 Text("Dein Tagebuch für Stimmung und Alltag", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
                 Text("Halte in wenigen Sekunden fest, wie es dir geht und was du gemacht hast. Mit der Zeit siehst du, was dir guttut.", style = MaterialTheme.typography.bodyLarge)
                 Panel(title = "Bevor es losgeht", padding = 14.dp) {
-                    Text("Stimmung, Schlaf oder Schmerzen sind Gesundheitsdaten. Deshalb fragen wir ausdrücklich:", style = MaterialTheme.typography.bodyMedium)
+                    Text("Stimmung, Schlaf oder Schmerzen sind Gesundheitsdaten. Deshalb vorab, was mit ihnen geschieht:", style = MaterialTheme.typography.bodyMedium)
                     Text("• Deine Einträge liegen auf diesem Gerät.\n• Nur wenn du dich später anmeldest, werden Texte, Stimmungen und Einstellungen zusätzlich bei Google Firebase in der EU gespeichert, damit deine Geräte denselben Stand haben.\n• Fotos und Sprachnotizen bleiben immer auf dem Gerät.\n• Du kannst jederzeit alles exportieren, alles löschen und diese Einwilligung widerrufen (Mehr › MediClever-Konto).", style = MaterialTheme.typography.bodyMedium)
                     CheckRow("Ich bin einverstanden, dass die App meine Tagebuchdaten einschließlich Gesundheitsangaben wie beschrieben verarbeitet.", consent) { consent = it }
                     CheckRow("Ich bin mindestens 18 Jahre alt.", adult) { adult = it }

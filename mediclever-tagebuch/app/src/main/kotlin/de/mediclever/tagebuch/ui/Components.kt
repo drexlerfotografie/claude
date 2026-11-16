@@ -245,7 +245,7 @@ fun MoodPicker(moods: List<Mood>, selectedId: String?, onSelect: (Mood) -> Unit,
                 ) {
                     MoodFace(level, shown?.icon ?: "a", size = 52.dp, muted = !isSel && selected != null)
                     Text(
-                        shown?.name ?: "–", style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        shown?.name ?: "–", style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                         fontWeight = if (isSel) FontWeight.ExtraBold else FontWeight.Medium,
                         color = if (isSel) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     )

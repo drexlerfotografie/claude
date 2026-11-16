@@ -81,9 +81,9 @@ private fun MoodsPage(onBack: () -> Unit) {
     val d = env.diary
     var editing by remember { mutableStateOf<Mood?>(null) }
     var showArchived by rememberSaveable { mutableStateOf(false) }
-    val levelNames = listOf("Stufe 1 · beste", "Stufe 2", "Stufe 3 · mittlere", "Stufe 4", "Stufe 5 · schlechteste")
+    val levelNames = listOf("Beste Stufe", "Gute Stufe", "Mittlere Stufe", "Schlechte Stufe", "Schlechteste Stufe")
     SubScreen("Stimmungen", onBack) {
-        Text("Jede Stufe kann mehrere Stimmungen haben, zum Beispiel „Gut“ und „Zufrieden“ auf Stufe 2.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Jede Stufe kann mehrere Stimmungen haben, zum Beispiel „Gut“ und „Zufrieden“ auf der guten Stufe.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (level in 1..5) {
             val list = d.moods.filter { it.level == level && (showArchived || it.archivedAt == null) }
             Panel(title = levelNames[level - 1], padding = 12.dp, action = {
@@ -450,7 +450,7 @@ private fun ScalePage(id: String, onBack: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun <T> Choice(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for ((value, label) in options) FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
     }
 }
@@ -472,7 +472,7 @@ private fun TemplatesPage(onBack: () -> Unit, open: (String) -> Unit) {
     val lazy = rememberLazyListState()
     val reorder = rememberReorderableLazyListState(lazy) { from, to -> list = list.toMutableList().apply { add(to.index, removeAt(from.index)) } }
     var restore by remember { mutableStateOf(false) }
-    SubScreen("Schreibvorlagen", onBack, scroll = false, actions = { TextButton({ restore = true }) { Text("Standard") } }) {
+    SubScreen("Schreibvorlagen", onBack, scroll = false, actions = { IconButton({ restore = true }) { Icon(Icons.Rounded.RestartAlt, "Standardvorlagen wiederherstellen") } }) {
         Text("Vorlagen geben einer Notiz ein Gerüst. Du fügst sie in der ganzen Notiz über „Vorlagen“ ein.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Button({ open("template:new") }, Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Vorlage hinzufügen") }
         LazyColumn(Modifier.weight(1f), state = lazy, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -483,7 +483,7 @@ private fun TemplatesPage(onBack: () -> Unit, open: (String) -> Unit) {
                             IconButton({}, Modifier.size(48.dp).draggableHandle(onDragStopped = { env.act { save(list.mapIndexed { i, x -> x.copy(sortOrder = i) }) } })) { Icon(Icons.Rounded.DragIndicator, "Zum Sortieren ziehen", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                                 Text(t.title, style = MaterialTheme.typography.titleMedium)
-                                NoteText(t.body, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+                                Text(de.mediclever.tagebuch.core.text.NoteHtml.toPlainText(t.body).lines().filter { it.isNotBlank() }.joinToString(" · "), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
