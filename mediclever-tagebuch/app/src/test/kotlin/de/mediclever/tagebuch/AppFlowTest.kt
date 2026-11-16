@@ -135,3 +135,33 @@ class AppFlowTest {
         waitText("Dein Tagebuch ist noch leer")
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [35], qualifiers = "w412dp-h915dp-xhdpi")
+class ResetFlowTest {
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val container get() = (rule.activity.application as TagebuchApp).container
+    @org.junit.After fun tearDown() { runCatching { container.close() } }
+    private fun waitText(text: String) = rule.waitUntil(15_000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+
+    /** "App zurücksetzen" in den Einstellungen loescht alles und fuehrt zurueck zur Einrichtung. */
+    @Test fun resetReturnsToOnboarding() {
+        waitText("Dein Tagebuch für Stimmung und Alltag")
+        rule.onNodeWithText("Ich bin einverstanden", substring = true).performScrollTo().performClick()
+        rule.onNodeWithText("Ich bin mindestens 18 Jahre alt.").performScrollTo().performClick()
+        rule.onNodeWithText("Weiter").performScrollTo().performClick()
+        rule.onNodeWithText("Tagebuch einrichten").performScrollTo().performClick()
+        waitText("Dein Tagebuch ist noch leer")
+        assertTrue(runBlocking { container.repo.snapshot() }.tags.isNotEmpty())
+        rule.onNodeWithText("Mehr").performClick()
+        rule.onNodeWithText("Einstellungen").performScrollTo().performClick()
+        rule.onNodeWithText("App zurücksetzen").performScrollTo().performClick()
+        waitText("App zurücksetzen?")
+        rule.onNodeWithText("Endgültig zurücksetzen").performClick()
+        waitText("Dein Tagebuch für Stimmung und Alltag")
+        val d = runBlocking { container.repo.snapshot() }
+        assertTrue(d.moods.isEmpty() && d.tags.isEmpty() && d.entries.isEmpty())
+        assertEquals(0L, runBlocking { container.prefs.current() }.consentAt)
+    }
+}

@@ -258,6 +258,8 @@ fun SettingsScreen() {
     val nav = LocalNav.current
     val s = env.diary.settings
     fun set(change: (UserSettings) -> UserSettings) = env.act { updateSettings(change) }
+    var clear by remember { mutableStateOf(false) }
+    var reset by remember { mutableStateOf(false) }
     SubScreen("Einstellungen", nav.back) {
         Panel(title = "Wochenanfang", padding = 12.dp) { Choice(listOf(1 to "Montag", 6 to "Samstag", 7 to "Sonntag"), s.weekStart) { w -> set { it.copy(weekStart = w) } } }
         Panel(title = "Einträge nach Mitternacht", padding = 12.dp) {
@@ -271,5 +273,15 @@ fun SettingsScreen() {
             RowDivider()
             SwitchRow("Berichte ankündigen", "Benachrichtigung zum Wochen- und Monatsbericht", Icons.Rounded.Assessment, s.reportNotifications) { on -> set { it.copy(reportNotifications = on) } }
         }
+        SectionLabel("Zurücksetzen")
+        RowGroup {
+            SettingRow("Tagebuch leeren", "Löscht alle ${env.diary.entries.size} Einträge, Fotos und die Einrichtung. PIN und Konto bleiben.", Icons.Rounded.DeleteSweep, iconTint = MaterialTheme.colorScheme.error, onClick = { clear = true })
+            RowDivider()
+            SettingRow("App zurücksetzen", "Löscht alles auf diesem Gerät, auch Einstellungen, PIN und Einwilligung. Die App startet danach wie neu.", Icons.Rounded.RestartAlt, iconTint = MaterialTheme.colorScheme.error, onClick = { reset = true })
+        }
     }
+    if (clear) ConfirmDialog("Tagebuch leeren?", "Alle Einträge, Fotos, Aufnahmen, Ziele und die gesamte Einrichtung werden gelöscht. Das lässt sich nicht rückgängig machen. Bist du angemeldet, verschwinden die Daten auch aus deinem Konto.", "Endgültig leeren", destructive = true,
+        onConfirm = { clear = false; env.act { clearDiary(); save(de.mediclever.tagebuch.data.StarterPacks.defaultMoods()) } }, onDismiss = { clear = false }, alternative = "Erst sichern", onAlternative = { clear = false; nav.go(Routes.DATA) })
+    if (reset) ConfirmDialog("App zurücksetzen?", "Alles auf diesem Gerät wird gelöscht: Tagebuch, Fotos, Einstellungen, PIN und Einwilligung. Die App startet danach mit der Einrichtung. Daten in deinem Konto bleiben dort erhalten.", "Endgültig zurücksetzen", destructive = true,
+        onConfirm = { reset = false; env.act { wipeLocal() } }, onDismiss = { reset = false }, alternative = "Erst sichern", onAlternative = { reset = false; nav.go(Routes.DATA) })
 }

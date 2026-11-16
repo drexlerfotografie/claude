@@ -55,6 +55,10 @@ class TagebuchApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Ab Android 14 lehnt das System ZIP-Archive ab, deren Eintraege mit "/" beginnen. Genau so
+        // sind Daylio-Backups aufgebaut. Die App prueft jeden Pfad selbst (ImportArchive.safePath)
+        // und entpackt nie ausserhalb ihres Zielordners, deshalb wird die Systempruefung abgeschaltet.
+        if (android.os.Build.VERSION.SDK_INT >= 34) runCatching { dalvik.system.ZipPathValidator.clearCallback() }
         ReminderScheduler.createChannels(this)
         container = AppContainer(this)
     }

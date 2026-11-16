@@ -143,7 +143,7 @@ class DataOps(private val context: Context, private val repo: DiaryRepository) {
             }
             return@withContext Opened.Csv(file, CsvFormat.parse(file.readText(), live(repo.snapshot())))
         }
-        val names = runCatching { ZipFile(file).use { z -> z.entries().asSequence().map { it.name.trimStart('/') }.toList() } }.getOrElse { throw ImportException("Die Datei ist beschädigt oder kein gültiges Archiv.") }
+        val names = runCatching { ZipFile(file).use { z -> z.entries().asSequence().map { it.name.trimStart('/') }.toList() } }.getOrElse { e -> throw ImportException("Das Archiv ließ sich nicht öffnen (${e.javaClass.simpleName}). Ist auf dem Gerät genug Speicher frei? Die Datei wird zum Lesen einmal kopiert.") }
         when {
             BackupFormat.JSON_NAME in names -> Opened.Archive(file, "Sicherung von MediClever Tagebuch", BackupFormat.read(file))
             names.any { it.endsWith("backup.daylio") } -> Opened.Archive(file, "Backup im Daylio-Format", DaylioBackup.read(file))
