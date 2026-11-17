@@ -12,6 +12,8 @@ import de.mediclever.tagebuch.ui.entry.EntryDraft
 import de.mediclever.tagebuch.ui.entry.EntryEditScreen
 import de.mediclever.tagebuch.ui.entry.Midnight
 import de.mediclever.tagebuch.ui.home.HomeScreen
+import de.mediclever.tagebuch.ui.home.MenuScreen
+import de.mediclever.tagebuch.ui.home.MonitorScreen
 import de.mediclever.tagebuch.ui.more.*
 import de.mediclever.tagebuch.ui.setup.SetupScreen
 
@@ -25,7 +27,9 @@ fun AppNav(startRoute: String? = null, presetLevel: Int? = null, onRouteConsumed
 
     CompositionLocalProvider(LocalNav provides navApi) {
         NavHost(nav, startDestination = Routes.HOME) {
-            composable(Routes.HOME) { HomeScreen() }
+            composable(Routes.HOME) { MonitorScreen() }
+            composable("section/{tab}", arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 })) { HomeScreen(startTab = it.arguments?.getInt("tab") ?: 0) }
+            composable(Routes.MENU) { MenuScreen() }
             composable(Routes.SEARCH) { SearchScreen() }
             composable("entry/new?date={date}", arguments = listOf(navArgument("date") { type = NavType.StringType; defaultValue = "" })) { entry ->
                 val date = entry.arguments?.getString("date").orEmpty()
@@ -82,5 +86,5 @@ private fun NewEntry(date: String, presetLevel: Int?, nav: Nav) {
             else -> EntryDraft(date = now.toLocalDate().toString(), minuteOfDay = now.hour * 60 + now.minute, moodId = mood?.id)
         }
     }
-    EntryEditScreen(draft, onClose = { nav.back() }, onOpenSetup = { nav.go(Routes.setup(it)) }, startStep = if (draft.moodId != null) 2 else 1)
+    EntryEditScreen(draft, onClose = { nav.back() }, onOpenSetup = { nav.go(Routes.setup(it)) })
 }

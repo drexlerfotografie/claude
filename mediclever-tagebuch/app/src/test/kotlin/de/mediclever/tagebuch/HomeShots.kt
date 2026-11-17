@@ -13,7 +13,9 @@ class HomeShots : ShotBase() {
     @Test fun entries() = shot("eintraege") { HomeScreen() }
     @Test fun entriesPastMonth() = shot("eintraege_vormonat") { HomeScreen(startMonth = YearMonth.of(2026, 9)) }
     @Test fun entriesEmpty() = shot("eintraege_leer", Diary(moods = StarterPacks.defaultMoods())) { HomeScreen() }
-    @Test fun more() = shot("mehr") { HomeScreen(startTab = 3) }
+    @Test fun more() = shot("mehr") { de.mediclever.tagebuch.ui.home.MenuScreen() }
+    @Test fun monitor() = shot("monitor") { de.mediclever.tagebuch.ui.home.MonitorScreen() }
+    @Test fun monitorEmpty() = shot("monitor_leer", Diary(moods = StarterPacks.defaultMoods())) { de.mediclever.tagebuch.ui.home.MonitorScreen() }
 }
 
 @RunWith(RobolectricTestRunner::class)

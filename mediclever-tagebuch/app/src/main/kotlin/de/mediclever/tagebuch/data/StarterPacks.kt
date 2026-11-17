@@ -10,8 +10,8 @@ object StarterPacks {
     data class Pack(val key: String, val title: String, val description: String)
 
     val packs = listOf(
-        Pack("allgemein", "Allgemein", "Schlaf, Essen, Bewegung, Menschen und Freizeit. Passt für die meisten."),
-        Pack("schichtdienst", "Schichtdienst", "Wie Allgemein, dazu Dienste, Erholung zwischen den Schichten und Belastung."),
+        Pack("schichtdienst", "BOS und Schichtdienst", "Für Rettungsdienst, Feuerwehr, Klinik, Polizei, THW und Bundeswehr: Dienste, Einsätze, Belastung und Erholung zwischen den Schichten."),
+        Pack("allgemein", "Allgemein", "Schlaf, Essen, Bewegung, Menschen und Freizeit. Ohne Dienstbezug."),
         Pack("leer", "Leer starten", "Nur die fünf Stimmungen. Du legst alles selbst an."),
     )
 
@@ -51,7 +51,9 @@ object StarterPacks {
         val b = Builder()
         if (key == "schichtdienst") {
             b.group("Dienst", 0, "Frühdienst" to "wb_sunny", "Spätdienst" to "schedule", "Nachtdienst" to "nightlight",
-                "24-h-Dienst" to "emergency", "Frei" to "weekend", "Fortbildung" to "school", "Überstunden" to "alarm")
+                "24-h-Dienst" to "emergency", "Bereitschaft" to "access_time", "Frei" to "weekend", "Überstunden" to "work_history")
+            b.group("Im Dienst", 1, "Viele Einsätze" to "local_fire_department", "Ruhige Schicht" to "self_improvement", "Belastender Einsatz" to "crisis_alert",
+                "Gutes Team" to "diversity_3", "Konflikt" to "heart_broken", "Übung" to "sports_martial_arts", "Fortbildung" to "school", "Keine Pause" to "no_food")
             b.textScale("Belastung im Dienst", "speed", 1, Trend.LOWER_IS_BETTER, "ruhig", "normal", "fordernd", "sehr hoch")
         }
         b.duration("Schlafdauer", "bed", 6, 14, Trend.HIGHER_IS_BETTER)

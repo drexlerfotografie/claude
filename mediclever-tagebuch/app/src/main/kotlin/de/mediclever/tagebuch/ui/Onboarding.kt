@@ -29,7 +29,7 @@ fun OnboardingScreen(startStep: Int = 0) {
     var step by rememberSaveable { mutableIntStateOf(startStep) }
     var consent by rememberSaveable { mutableStateOf(false) }
     var adult by rememberSaveable { mutableStateOf(false) }
-    var pack by rememberSaveable { mutableStateOf("allgemein") }
+    var pack by rememberSaveable { mutableStateOf("schichtdienst") }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

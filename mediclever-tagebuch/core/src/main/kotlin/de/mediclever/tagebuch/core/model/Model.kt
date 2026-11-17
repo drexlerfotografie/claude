@@ -277,7 +277,8 @@ data class UserSettings(
     val midnightRule: MidnightRule = MidnightRule.ASK,
     val showQuote: Boolean = true,
     val showMemories: Boolean = true,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Hell ist die Grundstimmung der App; Dunkel und "wie das Geraet" sind waehlbar. */
+    val themeMode: ThemeMode = ThemeMode.LIGHT,
     /** Schluessel eines Farbschemas fuer die fuenf Stufen, "custom" nutzt customMoodColors. */
     val moodScheme: String = "klar",
     /** Fuenf Farben als ARGB-Hex ohne #, Stufe 1 zuerst. */

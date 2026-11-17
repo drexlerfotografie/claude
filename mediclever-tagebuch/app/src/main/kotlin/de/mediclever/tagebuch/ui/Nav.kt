@@ -10,6 +10,8 @@ val LocalNav = compositionLocalOf { Nav() }
 object Routes {
     const val HOME = "home"
     const val SEARCH = "search"
+    fun section(tab: Int) = "section/$tab"
+    const val MENU = "menu"
     fun newEntry(date: String? = null) = "entry/new?date=${date ?: ""}"
     fun editEntry(id: String) = "entry/edit/$id"
     fun setup(section: String = "") = "setup?section=$section"

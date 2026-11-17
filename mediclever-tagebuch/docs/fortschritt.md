@@ -1,5 +1,7 @@
 # Stand
 
+**17.11.2026:** Version 0.3.0 mit neuem Aufbau: Monitor-Startseite, Messung mit Barometer, keine untere Leiste, BOS-Startpaket als Vorgabe, Hell als Standard, Cleverle mit Frage des Tages (vorläufig das Logo-Symbol).
+
 **16.11.2026, abends:** Version 0.2.0. Der Daylio-Import ist gegen das echte Backup geprüft und korrigiert (Skalenpunkte, Farben, Stimmungsfarben, Wochentags-Ziele). Ursache der falschen Stufen auf dem Handy war ein CSV-Import, bei dem die App die Stufe geraten hat; jetzt fragt sie. Neu: Tagebuch beim Import ersetzen, einzelne Datei `backup.daylio`, 386 Symbole in Themenpaketen, 18 Farben, mehrere Aktivitäten auf einmal in eine Gruppe holen.
 
 **16.11.2026, erste Fassung:** Erste vollständige Fassung der Android-App. Sie baut, alle Tests sind grün, die App lief bisher nur in der Testumgebung, noch auf keinem echten Gerät.

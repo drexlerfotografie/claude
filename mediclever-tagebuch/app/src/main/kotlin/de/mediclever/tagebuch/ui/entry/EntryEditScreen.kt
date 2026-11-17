@@ -78,13 +78,12 @@ fun EntryEditScreen(
     initial: EntryDraft,
     onClose: () -> Unit,
     onOpenSetup: (String) -> Unit,
-    startStep: Int = if (initial.isNew) 1 else 2,
 ) {
     val env = LocalEnv.current
     val diary = env.diary
     val draftState = rememberSaveable(saver = DraftSaver) { mutableStateOf(initial) }
     var draft by draftState
-    var step by rememberSaveable { mutableIntStateOf(startStep) }
+    var needMood by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     val addedAssets = rememberSaveable { mutableStateOf(listOf<String>()) }
     val dirty = draft != initial
@@ -99,7 +98,7 @@ fun EntryEditScreen(
 
     fun save() {
         val d = draft
-        if (d.moodId == null) { step = 1; return }
+        if (d.moodId == null) { needMood = true; return }
         val entry = d.toEntry(ZoneId.systemDefault())
         val removed = initial.assetIds - d.assetIds.toSet()
         val goalIds = goalsOn(diary, LocalDate.parse(d.date)).map { it.id }
@@ -115,30 +114,24 @@ fun EntryEditScreen(
         onClose()
     }
 
-    BackHandler { if (step == 2 && initial.isNew) step = 1 else requestClose() }
+    BackHandler { requestClose() }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    if (step == 1) Text(if (initial.isNew) "Neuer Eintrag" else "Eintrag bearbeiten", maxLines = 1, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-                    else Column(Modifier.semantics(mergeDescendants = true) { heading() }) {
+                    Column(Modifier.semantics(mergeDescendants = true) { heading() }) {
+                        Text(if (initial.isNew) "MESSUNG" else "EINTRAG", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
                         Text(fmtDay(LocalDate.parse(draft.date), env.today), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
-                        Text(fmtTime(draft.minuteOfDay) + " Uhr", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                navigationIcon = {
-                    if (step == 2 && initial.isNew) IconButton({ step = 1 }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück zur Stimmung") }
-                    else IconButton(::requestClose) { Icon(Icons.Rounded.Close, "Schließen") }
-                },
+                navigationIcon = { IconButton(::requestClose) { Icon(Icons.Rounded.Close, "Schließen") } },
                 actions = {
-                    if (step == 2) {
-                        IconButton({ draft = draft.copy(favorite = !draft.favorite) }) {
-                            Icon(if (draft.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder, if (draft.favorite) "Favorit entfernen" else "Als Favorit markieren",
-                                tint = if (draft.favorite) MaterialTheme.colorScheme.primary else LocalContentColor.current)
-                        }
-                        TextButton(::save) { Text("Speichern", fontWeight = FontWeight.Bold) }
+                    IconButton({ draft = draft.copy(favorite = !draft.favorite) }) {
+                        Icon(if (draft.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder, if (draft.favorite) "Favorit entfernen" else "Als Favorit markieren",
+                            tint = if (draft.favorite) MaterialTheme.colorScheme.primary else LocalContentColor.current)
                     }
+                    TextButton(::save) { Text("Speichern", fontWeight = FontWeight.Bold) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -149,8 +142,8 @@ fun EntryEditScreen(
             Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (step == 1) StepOne(draft, { draft = it }, onNext = { step = 2 }, onOpenSetup = onOpenSetup, canSaveDirectly = true, onSave = ::save)
-            else StepTwo(draft, { draft = it }, onOpenSetup, onEditMood = { step = 1 }, onAssetAdded = { addedAssets.value = addedAssets.value + it }, onSave = ::save)
+            Messung(draft, { draft = it; if (it.moodId != null) needMood = false }, onOpenSetup, needMood)
+            StepTwo(draft, { draft = it }, onOpenSetup, onAssetAdded = { addedAssets.value = addedAssets.value + it }, onSave = ::save)
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -166,27 +159,35 @@ fun goalsOn(diary: Diary, date: LocalDate): List<Goal> = diary.goals.filter { g 
     g.archivedAt == null && g.startDate <= date.toString() && (g.endDate == null || date.toString() <= g.endDate!!)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Kopf der Messung: Datum, Uhrzeit und das Barometer. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun StepOne(draft: EntryDraft, onChange: (EntryDraft) -> Unit, onNext: () -> Unit, onOpenSetup: (String) -> Unit, canSaveDirectly: Boolean, onSave: () -> Unit) {
+private fun Messung(draft: EntryDraft, onChange: (EntryDraft) -> Unit, onOpenSetup: (String) -> Unit, needMood: Boolean) {
     val env = LocalEnv.current
     var pickDate by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
+    val moods = env.diary.moods.filter { it.archivedAt == null || it.id == draft.moodId }
+    val mood = env.diary.moodById[draft.moodId]
+    val sameLevel = moods.filter { it.level == mood?.level }
 
-    Text("Wie geht es dir?", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AssistChip({ pickDate = true }, { Text(fmtDay(LocalDate.parse(draft.date), env.today)) }, leadingIcon = { Icon(Icons.Rounded.CalendarMonth, null, Modifier.size(18.dp)) })
-        AssistChip({ pickTime = true }, { Text(fmtTime(draft.minuteOfDay) + " Uhr") }, leadingIcon = { Icon(Icons.Rounded.Schedule, null, Modifier.size(18.dp)) })
+        AssistChip({ pickDate = true }, { Text(fmtDay(LocalDate.parse(draft.date), env.today)) }, leadingIcon = { Icon(Icons.Rounded.CalendarMonth, null, Modifier.size(18.dp)) }, modifier = Modifier.heightIn(min = 48.dp))
+        AssistChip({ pickTime = true }, { Text(fmtTime(draft.minuteOfDay) + " Uhr") }, leadingIcon = { Icon(Icons.Rounded.Schedule, null, Modifier.size(18.dp)) }, modifier = Modifier.heightIn(min = 48.dp))
     }
-    Panel {
-        if (env.diary.moods.none { it.archivedAt == null }) Text("Es gibt noch keine Stimmungen. Lege sie in der Einrichtung an.")
-        MoodPicker(env.diary.moods, draft.moodId, onSelect = { onChange(draft.copy(moodId = it.id)); onNext() })
+    Panel(padding = 12.dp) {
+        MoodGauge(mood?.let { 6 - it.level }, mood?.name ?: "", onScore = { score ->
+            val level = 6 - score
+            // innerhalb derselben Stufe bleibt die gewaehlte Stimmung, sonst die erste der neuen Stufe
+            val next = if (mood?.level == level) mood else moods.firstOrNull { it.level == level }
+            if (next != null) onChange(draft.copy(moodId = next.id))
+        })
+        if (mood == null) Text(if (needMood) "Bitte erst einen Wert wählen." else "Zeiger ziehen oder auf den Bogen tippen", Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium, color = if (needMood) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        if (sameLevel.size > 1) FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+            for (m in sameLevel) FilterChip(m.id == draft.moodId, { onChange(draft.copy(moodId = m.id)) }, label = { Text(m.name) }, modifier = Modifier.heightIn(min = 48.dp))
+        }
+        TextButton({ onOpenSetup("moods") }, Modifier.align(Alignment.CenterHorizontally)) { Text("Stimmungen bearbeiten") }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        TextButton({ onOpenSetup("moods") }) { Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Stimmungen bearbeiten") }
-        if (draft.moodId != null) Button(onNext) { Text("Weiter") }
-    }
-    if (canSaveDirectly && draft.moodId != null) OutlinedButton(onSave, Modifier.fillMaxWidth()) { Text("Nur Stimmung speichern") }
 
     if (pickDate) {
         val state = rememberDatePickerState(
@@ -216,7 +217,7 @@ private fun StepOne(draft: EntryDraft, onChange: (EntryDraft) -> Unit, onNext: (
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StepTwo(
-    draft: EntryDraft, onChange: (EntryDraft) -> Unit, onOpenSetup: (String) -> Unit, onEditMood: () -> Unit,
+    draft: EntryDraft, onChange: (EntryDraft) -> Unit, onOpenSetup: (String) -> Unit,
     onAssetAdded: (String) -> Unit, onSave: () -> Unit,
 ) {
     val env = LocalEnv.current
@@ -226,17 +227,27 @@ private fun StepTwo(
     var newTagFor by remember { mutableStateOf<TagGroup?>(null) }
     var newTagUngrouped by remember { mutableStateOf(false) }
 
-    // Gewaehlte Stimmung, antippbar zum Aendern
-    Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(onClick = onEditMood).padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (mood != null) de.mediclever.tagebuch.ui.icons.MoodFace(mood.level, mood.icon, size = 44.dp)
-        Column(Modifier.weight(1f)) {
-            Text(mood?.name ?: "Stimmung wählen", style = MaterialTheme.typography.titleLarge)
-            Text("Datum, Uhrzeit oder Stimmung ändern", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Die haeufigsten Aktivitaeten der letzten 90 Tage stehen vorn, alle Gruppen folgen auf Wunsch
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    val frequent = remember(diary.entries, diary.tags) {
+        val since = env.today.minusDays(90).toString()
+        val counts = diary.entries.filter { it.localDate >= since }.flatMap { it.tagIds }.groupingBy { it }.eachCount()
+        diary.tags.filter { it.archivedAt == null && (counts[it.id] ?: 0) > 0 }.sortedByDescending { counts[it.id] }.take(8)
+    }
+    val shownFrequent = (frequent + diary.tags.filter { it.id in draft.tagIds && frequent.none { f -> f.id == it.id } })
+    Text("Was hat den Wert beeinflusst?", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp).semantics { heading() })
+    if (shownFrequent.isNotEmpty()) Panel(title = "Oft bei dir", padding = 12.dp) {
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (t in shownFrequent) FilterChip(t.id in draft.tagIds, { onChange(draft.toggleTag(t.id)) }, label = { Text(t.name) },
+                leadingIcon = { Icon(iconFor(t.icon), null, Modifier.size(18.dp)) }, modifier = Modifier.heightIn(min = 48.dp),
+                // Gewaehltes hebt sich klar ab: dunkle Flaeche, helle Schrift
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.onSurface, selectedLabelColor = MaterialTheme.colorScheme.surface, selectedLeadingIconColor = MaterialTheme.colorScheme.surface))
         }
-        Icon(Icons.Rounded.Edit, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    OutlinedButton({ showAll = !showAll }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+        Text(if (showAll) "Gruppen ausblenden" else "Alle Gruppen und Aktivitäten", Modifier.weight(1f))
+        Icon(if (showAll) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null)
     }
 
     // Gruppen und Skalen in der gemeinsamen Reihenfolge des Nutzers
@@ -268,6 +279,7 @@ private fun StepTwo(
     }
 
     for (block in blocks) {
+        if (block is TagGroup && !showAll) continue
         if (block is TagGroup) {
             val tags = diary.tags.filter { it.groupId == block.id && (it.archivedAt == null || it.id in draft.tagIds) }
             val isCollapsed = collapsed[block.id] ?: block.collapsed

@@ -10,11 +10,11 @@ import org.robolectric.RobolectricTestRunner
 class EntryShots : ShotBase() {
     private val d = SampleData.diary
 
-    @Test fun step1() = shot("eintrag_schritt1") {
+    @Test fun newEntry() = shot("messung_neu") {
         EntryEditScreen(EntryDraft(id = "neu", date = "2026-11-16", minuteOfDay = 19 * 60 + 30), {}, {})
     }
 
-    @Test fun step2() = shot("eintrag_schritt2") {
+    @Test fun existing() = shot("messung") {
         val e = d.entries.first()
         EntryEditScreen(EntryDraft.from(e, listOf(d.goals[1].id)), {}, {})
     }

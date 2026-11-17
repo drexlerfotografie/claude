@@ -15,7 +15,7 @@ import de.mediclever.tagebuch.ui.*
 fun MoreTab() {
     val nav = LocalNav.current
     val d = LocalEnv.current.diary
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         RowGroup {
             SettingRow("Ziele", if (d.goals.none { it.archivedAt == null }) "Regelmäßig dranbleiben" else plural(d.goals.count { it.archivedAt == null }, "aktives Ziel", "aktive Ziele"), Icons.Rounded.Flag, onClick = { nav.go(Routes.GOALS) })
             RowDivider()
