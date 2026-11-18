@@ -51,9 +51,11 @@ object StarterPacks {
         val b = Builder()
         if (key == "schichtdienst") {
             b.group("Dienst", 0, "Frühdienst" to "wb_sunny", "Spätdienst" to "schedule", "Nachtdienst" to "nightlight",
-                "24-h-Dienst" to "emergency", "Bereitschaft" to "access_time", "Frei" to "weekend", "Überstunden" to "work_history")
+                "24-h-Dienst" to "emergency", "Bereitschaft" to "access_time", "Frei" to "weekend")
+            // jede Dienstart mit eigener Farbe, damit Kalender und Auswertung sie unterscheiden
+            listOf(3, 0, 9, 13, 11, 4).forEachIndexed { i, c -> b.tags[i] = b.tags[i].copy(colorIndex = c) }
             b.group("Im Dienst", 1, "Viele Einsätze" to "local_fire_department", "Ruhige Schicht" to "self_improvement", "Belastender Einsatz" to "crisis_alert",
-                "Gutes Team" to "diversity_3", "Konflikt" to "heart_broken", "Übung" to "sports_martial_arts", "Fortbildung" to "school", "Keine Pause" to "no_food")
+                "Gutes Team" to "diversity_3", "Konflikt" to "heart_broken", "Übung" to "sports_martial_arts", "Fortbildung" to "school", "Keine Pause" to "no_food", "Überstunden" to "work_history")
             b.textScale("Belastung im Dienst", "speed", 1, Trend.LOWER_IS_BETTER, "ruhig", "normal", "fordernd", "sehr hoch")
         }
         b.duration("Schlafdauer", "bed", 6, 14, Trend.HIGHER_IS_BETTER)

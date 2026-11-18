@@ -25,3 +25,9 @@
 | CSV-Import | Die Stufe unbekannter Stimmungen wählt der Nutzer | Eine CSV-Datei enthält die Stufe nicht. Raten hat „Spitze“ in die Mitte gelegt. |
 | Echtes Backup | Liegt nur lokal unter `private/`, Tests prüfen ausschließlich Zählwerte und werden ohne Datei übersprungen | Vorgabe der Projektbeschreibung. |
 | Aufbau und Navigation | „Monitor“ als Startseite (Verlaufskurve, Kacheln, Lasche mit Menü), Eintrag als „Messung“ mit Barometer und der Frage „Was hat den Wert beeinflusst?“; keine Leiste am unteren Rand | Entscheidung von Lukas und seiner Frau am 17.11.2026 (Entwurf C): eigenständiger Auftritt statt Nähe zum Vorbild. Zielgruppe zuerst BOS und Schichtdienst, hell als Grundstimmung, Cleverle stellt die Frage des Tages. |
+
+## Dienstarten als Aktivitäten einer Gruppe (18.11.2026)
+Eine Dienstart ist eine Aktivität aus der Dienstgruppe, kein eigenes Datenformat. So laufen Abgleich, Sicherung, Import, Farben und die vorhandenen Auswertungen ohne Room-Migration mit. Welche Gruppe das ist, steht in `UserSettings.shiftGroupId` (leer: Gruppe namens „Dienst“). Kurzname, Zeiten und „zählt als frei“ liegen als `ShiftTime` in den Einstellungen. Im Eintrag ist genau eine Dienstart wählbar (`Shifts.select`). Ausschalten heißt archivieren; alte Einträge behalten ihre Dienstart.
+
+## Neue Bedienung (18.11.2026)
+Startseite: eine Frage, Barometer mit Ring der laufenden Woche, darunter Skalen-Kacheln, Monatsmatrix, ein Satz. Ein Tipp auf den Bogen öffnet den Eintrag mit diesem Wert. Leiste überall gleich: Start, Einträge, Einsprechen, Auswertung, Menü. Der Kalender öffnet sich über die Matrix und das Menü. Im Eintrag steht der Wert klein oben rechts; Skalen sind flache Zeilen und stehen vor den Aktivitäten. Tageskacheln: ein Eintrag einfarbig, zwei geteilt, ab drei Verlauf. Typ, Detailtiefe, Tonfall, Reihenfolge und Startblöcke liegen in den Einstellungen und werden abgeglichen.

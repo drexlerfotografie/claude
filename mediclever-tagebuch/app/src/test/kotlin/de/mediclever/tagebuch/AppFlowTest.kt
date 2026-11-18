@@ -39,7 +39,7 @@ class AppFlowTest {
         rule.onNodeWithText("Weiter").performScrollTo().assertIsEnabled().performClick()
         rule.onNodeWithText(pack).performClick()
         rule.onNodeWithText("Tagebuch einrichten").performScrollTo().performClick()
-        waitText("Dein Verlauf")
+        waitText("Wie war dein Tag?")
     }
 
     @Test fun onboardingCreatesSetupAndRecordsConsent() {
@@ -55,20 +55,22 @@ class AppFlowTest {
 
     @Test fun createEditAndDeleteEntry() {
         onboard()
-        rule.onNodeWithText("Messen").performClick()
-        waitText("Was hat den Wert beeinflusst?")
         // Ohne Wert laesst sich nicht speichern
-        rule.onNode(hasText("Speichern") and !hasAnyAncestor(hasScrollAction())).performClick()
+        rule.onNodeWithContentDescription("Anderen Tag, Ziel oder wichtigen Tag anlegen").performClick()
+        waitText("Heute"); rule.onNodeWithText("Heute").performClick()
+        waitText("NEUER EINTRAG")
+        rule.onNodeWithText("Speichern").performClick()
         waitText("Bitte erst einen Wert wählen.")
-        // Barometer auf 4 von 5 stellen: das ist die gute Stufe
+        // Barometer auf 4 von 5 stellen: das ist die gute Stufe. Danach steht der Wert klein oben rechts.
         rule.onNodeWithContentDescription("Stimmung").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(4f) }
-        waitText("Gut")
-        rule.onNodeWithText("Alle Gruppen und Aktivitäten").performScrollTo().performClick()
-        waitText("Dienst")
-        rule.onNodeWithText("Nachtdienst").performScrollTo().performClick()
+        rule.waitUntil(15_000) { rule.onAllNodesWithContentDescription("Wert 4 von 5, Gut. Ändern").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithContentDescription("Stimmung").assertDoesNotExist()
+        // Dienstart: genau eine
+        rule.onNodeWithContentDescription("Dienstart Spätdienst").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Dienstart Nachtdienst").performScrollTo().performClick()
         rule.onNodeWithContentDescription("gut").performScrollTo().performClick()
-        rule.onNodeWithText("Kurze Notiz …").performScrollTo().performTextInput("Ruhige Nacht")
-        rule.onNode(hasText("Speichern") and hasAnyAncestor(hasScrollAction())).performScrollTo().performClick()
+        rule.onNodeWithText("Notiz schreiben …").performScrollTo().performTextInput("Ruhige Nacht")
+        rule.onNodeWithText("Speichern").performClick()
         waitFor("Eintrag gespeichert") { diary().entries.size == 1 }
 
         val e = diary().entries.single()
@@ -82,14 +84,14 @@ class AppFlowTest {
         assertTrue(e.dirty)
 
         // Eintrag erscheint in der Liste und laesst sich aendern
-        waitText("Heute gemessen")
+        waitText("Wie war dein Tag?")
         rule.onRoot().captureRoboImage("build/shots/ablauf_erster_eintrag.png")
-        rule.onNodeWithText("Einträge").performClick()
+        rule.onNodeWithContentDescription("Einträge").performClick()
         waitText("Ruhige Nacht")
         rule.onNodeWithText("Ruhige Nacht").performClick()
         waitText("EINTRAG")
         rule.onNodeWithContentDescription("Als Favorit markieren").performClick()
-        rule.onNode(hasText("Speichern") and !hasAnyAncestor(hasScrollAction())).performClick()
+        rule.onNodeWithText("Speichern").performClick()
         waitFor("Favorit gespeichert") { diary().entries.single().favorite }
         assertEquals(e.timestamp, diary().entries.single().timestamp)
 
@@ -105,13 +107,22 @@ class AppFlowTest {
 
     @Test fun tabsAndMoreScreensOpenWithoutCrash() {
         onboard("Allgemein")
-        for (section in listOf("Auswertung", "Kalender", "Einträge")) {
-            rule.onNodeWithText(section).performClick(); rule.waitForIdle()
-            rule.onNodeWithContentDescription("Zurück zum Monitor").performClick(); rule.waitForIdle()
-            rule.onNodeWithText("Dein Verlauf").assertExists()
+        for (section in listOf("Auswertung", "Einträge")) {
+            rule.onNodeWithContentDescription(section).performClick(); rule.waitForIdle()
+            rule.onNodeWithContentDescription("Zurück zur Startseite").performClick(); rule.waitForIdle()
+            rule.onNodeWithText("Wie war dein Tag?").assertExists()
         }
-        rule.onNodeWithText("Alles").performClick(); rule.waitForIdle()
-        for (row in listOf("Ziele", "Berichte", "Rückblick", "Wichtige Tage", "Favoriten", "Fotos", "Erfolge", "Einrichtung", "Erinnerungen", "Aussehen", "Sicherheit", "Einstellungen", "Daten", "MediClever-Konto", "Über die App")) {
+        // Der Kalender oeffnet sich ueber die Monatsmatrix
+        rule.onNode(hasContentDescription("Öffnet den Kalender", substring = true)).performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithContentDescription("Zurück zur Startseite").performClick(); rule.waitForIdle()
+        rule.onNodeWithText("Wie war dein Tag?").assertExists()
+        // Die Leiste wechselt direkt zwischen den Bereichen und fuehrt zurueck zum Start
+        rule.onNodeWithContentDescription("Einträge").performClick(); rule.waitForIdle()
+        rule.onNodeWithContentDescription("Auswertung").performClick(); rule.waitForIdle()
+        rule.onNodeWithContentDescription("Start").performClick(); rule.waitForIdle()
+        rule.onNodeWithText("Wie war dein Tag?").assertExists()
+        rule.onNodeWithContentDescription("Menü").performClick(); rule.waitForIdle()
+        for (row in listOf("Dienstarten", "Ziele", "Berichte", "Rückblick", "Wichtige Tage", "Favoriten", "Fotos", "Erfolge", "Einrichtung", "Erinnerungen", "Aussehen", "Sicherheit", "Einstellungen", "Daten", "MediClever-Konto", "Über die App")) {
             rule.onNodeWithText(row).performScrollTo().performClick()
             rule.waitForIdle()
             rule.onAllNodesWithContentDescription("Zurück").onLast().assertExists("Seite $row hat keinen Zurück-Pfeil")
@@ -129,8 +140,8 @@ class AppFlowTest {
         rule.onNodeWithText("Was möchtest du erreichen?").performTextInput("Abends lesen")
         rule.onNodeWithText("Speichern").performClick()
         waitFor("Ziel gespeichert") { diary().goals.size == 1 }
-        waitText("Dein Verlauf")
-        rule.onNodeWithText("Einträge").performClick()
+        waitText("Wie war dein Tag?")
+        rule.onNodeWithContentDescription("Einträge").performClick()
         waitText("Ziele heute")
         rule.onNodeWithText("Abends lesen").performClick()
         waitFor("Ziel abgehakt") { diary().goalChecks.any { !it.deleted && it.date == LocalDate.now().toString() } }
@@ -145,7 +156,7 @@ class AppFlowTest {
         waitText("Die PIN stimmt nicht.")
         rule.onNodeWithText("PIN").performTextInput("2468")
         rule.onNodeWithText("Entsperren").performClick()
-        waitText("Dein Verlauf")
+        waitText("Wie war dein Tag?")
     }
 }
 
@@ -165,9 +176,9 @@ class ResetFlowTest {
         rule.onNodeWithText("Ich bin mindestens 18 Jahre alt.").performScrollTo().performClick()
         rule.onNodeWithText("Weiter").performScrollTo().performClick()
         rule.onNodeWithText("Tagebuch einrichten").performScrollTo().performClick()
-        waitText("Dein Verlauf")
+        waitText("Wie war dein Tag?")
         assertTrue(runBlocking { container.repo.snapshot() }.tags.isNotEmpty())
-        rule.onNodeWithText("Alles").performClick()
+        rule.onNodeWithContentDescription("Menü").performClick()
         rule.onNodeWithText("Einstellungen").performScrollTo().performClick()
         rule.onNodeWithText("App zurücksetzen").performScrollTo().performClick()
         waitText("App zurücksetzen?")

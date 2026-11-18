@@ -297,7 +297,9 @@ service cloud.firestore {
     function validSettings(d) {
       return hasExactly(d,
           ['weekStart', 'midnightRule', 'showQuote', 'showMemories', 'themeMode', 'moodScheme',
-           'customMoodColors', 'fontChoice', 'reportNotifications', 'updatedAt', 'syncedAt'],
+           'customMoodColors', 'fontChoice', 'reportNotifications', 'shiftGroupId', 'shiftTimes',
+           'userType', 'detail', 'tone', 'cleverleHints', 'startBlocks', 'startScaleIds', 'entryOrder',
+           'modules', 'voiceAutoApply', 'voiceLearn', 'keywords', 'updatedAt', 'syncedAt'],
           [])
         && isInt(d.weekStart, 1, 7)
         && d.midnightRule in ['ASK', 'PREVIOUS_DAY', 'CURRENT_DAY']
@@ -312,6 +314,19 @@ service cloud.firestore {
         && colorAt(d.customMoodColors, 4)
         && isText(d.fontChoice, 1, 50)
         && d.reportNotifications is bool
+        && isText(d.shiftGroupId, 0, 150)
+        && d.shiftTimes is list && d.shiftTimes.size() <= 60
+        && d.userType in ['SCHNELL', 'AUSGEWOGEN', 'ANALYTISCH', 'ERZAEHLEND']
+        && d.detail in ['KOMPAKT', 'NORMAL', 'ALLES']
+        && d.tone in ['SACHLICH', 'FREUNDLICH', 'KNAPP', 'CLEVERLE']
+        && d.cleverleHints is bool
+        && isIdList(d.startBlocks) && d.startBlocks.size() <= 12
+        && isIdList(d.startScaleIds) && d.startScaleIds.size() <= 6
+        && isIdList(d.entryOrder) && d.entryOrder.size() <= 12
+        && isIdList(d.modules) && d.modules.size() <= 12
+        && d.voiceAutoApply is bool
+        && d.voiceLearn is bool
+        && d.keywords is list && d.keywords.size() <= 600
         && d.updatedAt is int
         && d.syncedAt == request.time;
     }

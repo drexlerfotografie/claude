@@ -269,6 +269,34 @@ enum class MidnightRule { ASK, PREVIOUS_DAY, CURRENT_DAY }
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** Zusatzangaben zu einer Dienstart. Die Dienstart selbst ist eine Aktivitaet der Dienstgruppe. */
+@Serializable
+data class ShiftTime(
+    val tagId: String,
+    /** Kurzname fuer enge Stellen, z. B. "Nacht". Leer: wird aus dem Namen abgeleitet. */
+    val short: String = "",
+    val startMinute: Int? = null,
+    val endMinute: Int? = null,
+    /** Zaehlt als freier Tag, nicht als Dienst. */
+    val free: Boolean = false,
+)
+
+/** Eigene Stichwoerter einer Aktivitaet fuer Vorschlaege aus der Sprachnotiz. */
+@Serializable
+data class KeywordSet(
+    val tagId: String,
+    val words: List<String> = emptyList(),
+    /** Woerter, bei denen diese Aktivitaet nie vorgeschlagen wird. */
+    val blocked: List<String> = emptyList(),
+)
+
+/** Der Typ stellt Detailtiefe, Tonfall und Reihenfolge vor. */
+enum class UserType { SCHNELL, AUSGEWOGEN, ANALYTISCH, ERZAEHLEND }
+
+enum class Detail { KOMPAKT, NORMAL, ALLES }
+
+enum class Tone { SACHLICH, FREUNDLICH, KNAPP, CLEVERLE }
+
 /** Einstellungen eines Nutzers. Wird als ein Dokument (settings/main) abgeglichen. */
 @Serializable
 data class UserSettings(
@@ -285,8 +313,39 @@ data class UserSettings(
     val customMoodColors: List<String> = emptyList(),
     val fontChoice: String = "roboto",
     val reportNotifications: Boolean = true,
+    /** Gruppe, deren Aktivitaeten die Dienstarten sind. Leer: Gruppe namens "Dienst", falls vorhanden. */
+    val shiftGroupId: String = "",
+    val shiftTimes: List<ShiftTime> = emptyList(),
+    val userType: UserType = UserType.AUSGEWOGEN,
+    val detail: Detail = Detail.NORMAL,
+    val tone: Tone = Tone.FREUNDLICH,
+    /** Cleverle darf Hinweise geben, nicht nur Zahlen nennen. */
+    val cleverleHints: Boolean = true,
+    /** Bloecke der Startseite unter dem Barometer, in Reihenfolge. Fehlende sind ausgeblendet. */
+    val startBlocks: List<String> = StartBlocks.DEFAULT,
+    /** Skalen der Kacheln auf der Startseite. Leer: die ersten drei. */
+    val startScaleIds: List<String> = emptyList(),
+    /** Abschnitte im Eintrag, in Reihenfolge. */
+    val entryOrder: List<String> = EntryBlocks.DEFAULT,
+    val modules: List<String> = listOf("schicht"),
+    /** Dienstart und Aktivitaeten aus der Sprachnotiz ohne Nachfrage uebernehmen. */
+    val voiceAutoApply: Boolean = false,
+    val voiceLearn: Boolean = true,
+    val keywords: List<KeywordSet> = emptyList(),
     val updatedAt: Long = 0,
 )
+
+object StartBlocks {
+    const val SCALES = "scales"; const val MATRIX = "matrix"; const val LINE = "line"
+    const val GOALS = "goals"; const val LAST = "last"
+    val DEFAULT = listOf(SCALES, MATRIX, LINE)
+    val ALL = listOf(SCALES, MATRIX, LINE, GOALS, LAST)
+}
+
+object EntryBlocks {
+    const val SHIFT = "shift"; const val SCALES = "scales"; const val TAGS = "tags"; const val NOTE = "note"
+    val DEFAULT = listOf(SHIFT, SCALES, TAGS, NOTE)
+}
 
 /** Vollstaendiger Datenbestand eines Nutzers, z. B. fuer Sicherung, Import und Auswertung. */
 @Serializable

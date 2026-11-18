@@ -34,8 +34,8 @@ android {
         applicationId = "de.mediclever.tagebuch"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.3.0"
+        versionCode = 6
+        versionName = "0.4.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", hasFirebaseConfig.toString())
         // -PfirebaseEmulator=true verbindet Debug-Builds mit dem lokalen Firebase-Emulator (siehe firebase/README.md)
         buildConfigField("boolean", "FIREBASE_EMULATOR", (providers.gradleProperty("firebaseEmulator").orNull == "true").toString())

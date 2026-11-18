@@ -24,7 +24,7 @@ import java.time.ZoneOffset
 private val sections = listOf("Einträge", "Auswertung", "Kalender")
 
 /**
- * Die drei Monatsbereiche (Eintraege, Auswertung, Kalender) als Unterseite des Monitors.
+ * Die drei Monatsbereiche (Eintraege, Auswertung, Kalender) als Unterseite der Startseite.
  * Oben stehen Zurueck, Monat und Suche, darunter der Umschalter zwischen den Bereichen.
  * Eine Leiste am unteren Rand gibt es nicht mehr.
  */
@@ -43,7 +43,7 @@ fun HomeScreen(startTab: Int = 0, startMonth: YearMonth? = null) {
         topBar = {
             Column {
                 TopAppBar(
-                    navigationIcon = { IconButton(nav.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück zum Monitor") } },
+                    navigationIcon = { IconButton(nav.home) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück zur Startseite") } },
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton({ setMonth(month.minusMonths(1)) }, Modifier.size(48.dp)) { Icon(Icons.Rounded.ChevronLeft, "Vorheriger Monat") }
@@ -55,13 +55,9 @@ fun HomeScreen(startTab: Int = 0, startMonth: YearMonth? = null) {
                     actions = { IconButton({ nav.go(Routes.SEARCH) }) { Icon(Icons.Rounded.Search, "Suchen") } },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
-                    sections.forEachIndexed { i, label ->
-                        SegmentedButton(tab == i, { tab = i }, SegmentedButtonDefaults.itemShape(i, sections.size), modifier = Modifier.heightIn(min = 48.dp), icon = {}) { Text(label) }
-                    }
-                }
             }
         },
+        bottomBar = { PillBar(when (tab) { 0 -> PillTab.ENTRIES; 1 -> PillTab.STATS; else -> PillTab.NONE }) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { pad ->
         Box(Modifier.padding(pad)) {
@@ -79,7 +75,7 @@ fun HomeScreen(startTab: Int = 0, startMonth: YearMonth? = null) {
 @Composable
 fun MenuScreen() {
     val nav = LocalNav.current
-    SubScreen("Alles", nav.back, scroll = false) { MoreTab() }
+    SubScreen("Menü", nav.back, scroll = false, bottomBar = { PillBar(PillTab.MENU) }) { MoreTab() }
 }
 
 /** Auswahl "Neu anlegen": anderer Tag, Ziel, wichtiger Tag. Der schnelle Weg fuer heute ist der Knopf "Messen". */
@@ -92,8 +88,8 @@ fun NewSheet(onDismiss: () -> Unit) {
     if (!pickOtherDay) ModalBottomSheet(onDismiss) {
         Column(Modifier.padding(bottom = 24.dp)) {
             Text("Neu anlegen", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp).semantics { heading() })
-            SettingRow("Heute", "Messung für ${fmtDayShort(env.today)}", Icons.Rounded.Today, onClick = { onDismiss(); nav.go(Routes.newEntry()) })
-            SettingRow("Gestern", "Messung für ${fmtDayShort(env.today.minusDays(1))}", Icons.Rounded.History, onClick = { onDismiss(); nav.go(Routes.newEntry(env.today.minusDays(1).toString())) })
+            SettingRow("Heute", "Eintrag für ${fmtDayShort(env.today)}", Icons.Rounded.Today, onClick = { onDismiss(); nav.go(Routes.newEntry(env.today.toString())) })
+            SettingRow("Gestern", "Eintrag für ${fmtDayShort(env.today.minusDays(1))}", Icons.Rounded.History, onClick = { onDismiss(); nav.go(Routes.newEntry(env.today.minusDays(1).toString())) })
             SettingRow("Anderer Tag", "Datum auswählen und nachtragen", Icons.Rounded.EditCalendar, onClick = { pickOtherDay = true })
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             SettingRow("Neues Ziel", "Etwas regelmäßig tun", Icons.Rounded.Flag, onClick = { onDismiss(); nav.go(Routes.goalEdit()) })

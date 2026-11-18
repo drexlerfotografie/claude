@@ -465,6 +465,23 @@ describe('settings/main: ungültige Inhalte', () => {
     'customMoodColors mit Zahl': withValue('customMoodColors', [1, 2, 3, 4, 5]),
     'customMoodColors ist keine Liste': withValue('customMoodColors', 'FF000000'),
     'reportNotifications als Zahl': withValue('reportNotifications', 0),
+    'shiftGroupId fehlt': without('shiftGroupId'),
+    'shiftGroupId zu lang': withValue('shiftGroupId', long(151)),
+    'shiftTimes ist keine Liste': withValue('shiftTimes', 'nacht'),
+    'shiftTimes mit 61 Einträgen': withValue('shiftTimes', Array.from({ length: 61 }, () => ({ tagId: 'a' }))),
+    'userType unbekannt': withValue('userType', 'PROFI'),
+    'detail unbekannt': withValue('detail', 'MAXIMAL'),
+    'tone unbekannt': withValue('tone', 'FRECH'),
+    'cleverleHints als Zeichenkette': withValue('cleverleHints', 'ja'),
+    'startBlocks mit Zahl': withValue('startBlocks', [1, 2]),
+    'startBlocks zu viele': withValue('startBlocks', Array.from({ length: 13 }, (_, i) => 'b' + i)),
+    'startScaleIds zu viele': withValue('startScaleIds', Array.from({ length: 7 }, (_, i) => 's' + i)),
+    'entryOrder ist keine Liste': withValue('entryOrder', 'shift'),
+    'modules mit leerem Eintrag': withValue('modules', ['']),
+    'voiceAutoApply fehlt': without('voiceAutoApply'),
+    'voiceLearn als Zahl': withValue('voiceLearn', 1),
+    'keywords ist keine Liste': withValue('keywords', {}),
+    'keywords mit 601 Einträgen': withValue('keywords', Array.from({ length: 601 }, () => ({ tagId: 'a' }))),
   };
   for (const [label, mutate] of Object.entries(cases)) {
     test(label, async () => {

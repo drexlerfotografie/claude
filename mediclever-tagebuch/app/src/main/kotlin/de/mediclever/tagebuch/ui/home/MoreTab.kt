@@ -17,6 +17,8 @@ fun MoreTab() {
     val d = LocalEnv.current.diary
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         RowGroup {
+            SettingRow("Kalender", "Der Monat mit Tageswert und Dienstart", Icons.Rounded.CalendarMonth, onClick = { nav.go(Routes.section(2)) })
+            RowDivider()
             SettingRow("Ziele", if (d.goals.none { it.archivedAt == null }) "Regelmäßig dranbleiben" else plural(d.goals.count { it.archivedAt == null }, "aktives Ziel", "aktive Ziele"), Icons.Rounded.Flag, onClick = { nav.go(Routes.GOALS) })
             RowDivider()
             SettingRow("Berichte", "Wochen und Monate im Überblick", Icons.Rounded.Assessment, onClick = { nav.go(Routes.REPORTS) })
@@ -33,6 +35,8 @@ fun MoreTab() {
         }
         SectionLabel("Dein Tagebuch")
         RowGroup {
+            SettingRow("Dienstarten", "Welche Dienste es bei dir gibt", Icons.Rounded.WorkHistory, onClick = { nav.go(Routes.SHIFTS) })
+            RowDivider()
             SettingRow("Einrichtung", "Stimmungen, Aktivitäten, Skalen, Vorlagen", Icons.Rounded.Tune, onClick = { nav.go(Routes.setup()) })
             RowDivider()
             SettingRow("Erinnerungen", "Uhrzeiten mit eigenem Text", Icons.Rounded.Notifications, onClick = { nav.go(Routes.REMINDERS) })

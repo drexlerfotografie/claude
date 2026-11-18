@@ -3,7 +3,7 @@ package de.mediclever.tagebuch.ui
 import androidx.compose.runtime.compositionLocalOf
 
 /** Navigation zwischen Bildschirmen. Ziele sind die Routen aus AppNav. */
-class Nav(val go: (String) -> Unit = {}, val back: () -> Unit = {})
+class Nav(val go: (String) -> Unit = {}, val back: () -> Unit = {}, val home: () -> Unit = {})
 
 val LocalNav = compositionLocalOf { Nav() }
 
@@ -12,7 +12,9 @@ object Routes {
     const val SEARCH = "search"
     fun section(tab: Int) = "section/$tab"
     const val MENU = "menu"
-    fun newEntry(date: String? = null) = "entry/new?date=${date ?: ""}"
+    fun newEntry(date: String? = null, score: Int? = null, voice: Boolean = false) = "entry/new?date=${date ?: ""}&score=${score ?: 0}&voice=$voice"
+    const val SHIFTS = "shifts"
+    const val PERSONAL = "personal"
     fun editEntry(id: String) = "entry/edit/$id"
     fun setup(section: String = "") = "setup?section=$section"
     const val GOALS = "goals"

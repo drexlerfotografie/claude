@@ -43,8 +43,15 @@ import kotlin.math.sin
  * Rastpunkten. Tippen oder Ziehen setzt den Wert. Der Wert ist die Punktzahl 1 bis 5
  * (5 ist die beste), also 6 minus Stufe; null heisst: noch nichts gewaehlt.
  */
+/** Ein Tag im Wochenring: Stufen seiner Eintraege (1 beste bis 5 schlechteste) in Tagesreihenfolge. */
+data class RingDay(val levels: List<Int>, val today: Boolean)
+
 @Composable
-fun MoodGauge(score: Int?, label: String, onScore: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun MoodGauge(
+    score: Int?, label: String, onScore: (Int) -> Unit, modifier: Modifier = Modifier,
+    ring: List<RingDay>? = null, emptyLabel: String = "Wie geht es dir?",
+    ends: Pair<String, String> = "sehr schlecht" to "sehr gut",
+) {
     val colors = LocalDiaryColors.current
     val track = MaterialTheme.colorScheme.surfaceVariant
     val knob = MaterialTheme.colorScheme.surface
@@ -52,6 +59,9 @@ fun MoodGauge(score: Int?, label: String, onScore: (Int) -> Unit, modifier: Modi
     val gap = MaterialTheme.colorScheme.surface
     val current by rememberUpdatedState(onScore)
     val active = score?.let { colors.level(6 - it) } ?: track
+    val ringEmpty = MaterialTheme.colorScheme.outlineVariant
+    val ringToday = MaterialTheme.colorScheme.onSurface
+    val ringColors = ring?.map { day -> day.levels.map { colors.level(it) } }
 
     // Position auf dem Bogen: Winkel 180 Grad (links) bis 0 Grad (rechts)
     fun scoreAt(pos: Offset, size: Size): Int {
@@ -75,7 +85,8 @@ fun MoodGauge(score: Int?, label: String, onScore: (Int) -> Unit, modifier: Modi
                     .pointerInput(Unit) { detectDragGestures { change, _ -> current(scoreAt(change.position, Size(size.width.toFloat(), size.height.toFloat()))) } },
             ) {
                 val stroke = 24.dp.toPx()
-                val radius = (size.width - stroke - 16.dp.toPx()) / 2
+                val ringSpace = if (ring != null) 22.dp.toPx() else 0f
+                val radius = (size.width - stroke - 16.dp.toPx()) / 2 - ringSpace
                 val center = Offset(size.width / 2, size.height - 24.dp.toPx())
                 val box = Size(radius * 2, radius * 2)
                 val topLeft = Offset(center.x - radius, center.y - radius)
@@ -87,6 +98,28 @@ fun MoodGauge(score: Int?, label: String, onScore: (Int) -> Unit, modifier: Modi
                 if (score != null) {
                     drawArc(active, 180f, 180f * (score - 1) / 4f + 0.01f, false, topLeft, box, style = Stroke(stroke, cap = StrokeCap.Round))
                 }
+                // Wochenring: ein Segment je Tag, mehrere Eintraege teilen das Segment
+                if (ring != null && ringColors != null) {
+                    val rr = radius + stroke / 2 + 13.dp.toPx()
+                    val rBox = Size(rr * 2, rr * 2); val rTop = Offset(center.x - rr, center.y - rr)
+                    val gapDeg = 5f; val n = ring.size
+                    val seg = (180f - gapDeg * (n - 1)) / n
+                    ring.forEachIndexed { i, day ->
+                        val start = 180f + i * (seg + gapDeg)
+                        val cs = ringColors[i]
+                        if (cs.isEmpty()) {
+                            if (day.today) {
+                                drawArc(ringToday, start, seg, false, rTop, rBox, style = Stroke(12.dp.toPx(), cap = StrokeCap.Round))
+                                drawArc(gap, start, seg, false, rTop, rBox, style = Stroke(6.dp.toPx(), cap = StrokeCap.Round))
+                            } else drawArc(ringEmpty, start, seg, false, rTop, rBox, style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
+                        } else {
+                            val part = seg / cs.size
+                            cs.forEachIndexed { k, c ->
+                                drawArc(c, start + k * part, part, false, rTop, rBox, style = Stroke(10.dp.toPx(), cap = if (cs.size == 1) StrokeCap.Round else StrokeCap.Butt))
+                            }
+                        }
+                    }
+                }
                 // Rastpunkte
                 for (s in 1..5) drawCircle(gap, 3.dp.toPx(), point(s))
                 if (score != null) {
@@ -97,12 +130,13 @@ fun MoodGauge(score: Int?, label: String, onScore: (Int) -> Unit, modifier: Modi
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 10.dp)) {
                 Text(score?.toString() ?: "–", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
-                Text(if (score == null) "Wie geht es dir?" else label, style = MaterialTheme.typography.titleMedium)
+                val below = if (score == null) emptyLabel else label
+                if (below.isNotEmpty()) Text(below, style = MaterialTheme.typography.titleMedium)
             }
         }
-        Row(Modifier.width(320.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("sehr schlecht", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("sehr gut", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.width(if (ring != null) 300.dp else 320.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(ends.first, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(ends.second, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
