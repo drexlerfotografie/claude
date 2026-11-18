@@ -32,7 +32,14 @@ data class LocalState(
     val hintSeen: Boolean = false,
     /** Konto, mit dem dieses Geraet zuletzt abgeglichen hat. */
     val lastUid: String = "",
-)
+    /** Wie oft ein Vorschlag aus der Sprachnotiz abgelehnt wurde, Schluessel "<ziel>|<wort>". */
+    val voiceRejects: Map<String, Int> = emptyMap(),
+    /** MediClever Tagebuch Plus ist freigeschaltet. Bis es einen Kauf gibt: Schalter in den Einstellungen. */
+    val plus: Boolean = false,
+) {
+    /** Vorschlaege, die dreimal abgelehnt wurden, kommen nicht mehr. */
+    val voiceRejected: Set<String> get() = voiceRejects.filterValues { it >= 3 }.keys
+}
 
 class LocalPrefs(private val store: DataStore<Preferences>) {
     /** scope bestimmt die Lebensdauer: endet er, gibt der Speicher seine Datei wieder frei. */
@@ -51,6 +58,8 @@ class LocalPrefs(private val store: DataStore<Preferences>) {
         val lastSyncError = stringPreferencesKey("lastSyncError")
         val hintSeen = booleanPreferencesKey("hintSeen")
         val lastUid = stringPreferencesKey("lastUid")
+        val voiceRejects = stringPreferencesKey("voiceRejects")
+        val plus = booleanPreferencesKey("plus")
         fun cursor(t: Table) = longPreferencesKey("cursor_${t.path}")
     }
 
@@ -66,6 +75,8 @@ class LocalPrefs(private val store: DataStore<Preferences>) {
             lastSyncError = p[K.lastSyncError] ?: "",
             hintSeen = p[K.hintSeen] ?: false,
             lastUid = p[K.lastUid] ?: "",
+            voiceRejects = p[K.voiceRejects]?.let { runCatching { AppJson.decodeFromString<Map<String, Int>>(it) }.getOrNull() } ?: emptyMap(),
+            plus = p[K.plus] ?: false,
         )
     }
 
@@ -80,6 +91,15 @@ class LocalPrefs(private val store: DataStore<Preferences>) {
     suspend fun setConsent(at: Long) { store.edit { it[K.consentAt] = at } }
     suspend fun setOnboardingDone(done: Boolean) { store.edit { it[K.onboardingDone] = done } }
     suspend fun setLastUid(uid: String) { store.edit { it[K.lastUid] = uid } }
+    suspend fun setPlus(on: Boolean) { store.edit { it[K.plus] = on } }
+    /** Zaehlt abgelehnte Vorschlaege; angenommene setzen den Zaehler zurueck. */
+    suspend fun countVoice(rejected: Collection<String>, accepted: Collection<String>) {
+        if (rejected.isEmpty() && accepted.isEmpty()) return
+        val now = current().voiceRejects.toMutableMap()
+        for (k in rejected) now[k] = (now[k] ?: 0) + 1
+        for (k in accepted) now.remove(k)
+        store.edit { it[K.voiceRejects] = AppJson.encodeToString(now.toMap()) }
+    }
     suspend fun setHintSeen() { store.edit { it[K.hintSeen] = true } }
     suspend fun setPin(hash: String, salt: String) { store.edit { it[K.pinHash] = hash; it[K.pinSalt] = salt } }
     suspend fun setSyncResult(at: Long, error: String) {

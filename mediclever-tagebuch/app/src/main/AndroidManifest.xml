@@ -8,6 +8,11 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Spracherkennung des Geraets fuer Sprachnotizen finden -->
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+    </queries>
+
     <application
         android:name=".TagebuchApp"
         android:allowBackup="false"

@@ -92,6 +92,7 @@ fun EntryEditScreen(
     var needMood by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var pickMood by remember { mutableStateOf(false) }
+    var voice by rememberSaveable { mutableStateOf(startVoice) }
     val addedAssets = rememberSaveable { mutableStateOf(listOf<String>()) }
     val dirty = draft != initial
     val mood = diary.moodById[draft.moodId]
@@ -160,11 +161,12 @@ fun EntryEditScreen(
                 Text(if (needMood) "Bitte erst einen Wert wählen." else "Zeiger ziehen oder auf den Bogen tippen", Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium, color = if (needMood) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            EntryBody(draft, { draft = it }, onOpenSetup, onAssetAdded = { addedAssets.value = addedAssets.value + it })
+            EntryBody(draft, { draft = it }, onOpenSetup, onAssetAdded = { addedAssets.value = addedAssets.value + it }, onVoice = { voice = true })
             Spacer(Modifier.height(12.dp))
         }
     }
 
+    if (voice) VoiceDialog(draft, onApply = { draft = it }, onAssetAdded = { addedAssets.value = addedAssets.value + it }) { voice = false }
     if (pickMood) MoodDialog(draft, { draft = it }, onOpenSetup = { pickMood = false; onOpenSetup("moods") }) { pickMood = false }
     if (confirmDiscard) ConfirmDialog(
         "Änderungen verwerfen?", "Deine Eingaben in diesem Eintrag gehen verloren.", "Verwerfen",
@@ -364,7 +366,7 @@ private fun ScalesBlock(draft: EntryDraft, onChange: (EntryDraft) -> Unit) {
 @Composable
 private fun EntryBody(
     draft: EntryDraft, onChange: (EntryDraft) -> Unit, onOpenSetup: (String) -> Unit,
-    onAssetAdded: (String) -> Unit,
+    onAssetAdded: (String) -> Unit, onVoice: () -> Unit,
 ) {
     val env = LocalEnv.current
     val diary = env.diary
@@ -403,6 +405,7 @@ private fun EntryBody(
                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 trailingIcon = { IconButton({ fullNote = true }) { Icon(Icons.Rounded.OpenInFull, "Ganze Notiz mit Titel und Vorlagen") } },
             )
+            Button(onVoice, Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Rounded.Mic, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Notiz einsprechen") }
         }
     }
 
@@ -428,7 +431,7 @@ private fun EntryBody(
         }
     }
 
-    MediaSection(draft, onChange, onAssetAdded)
+    MediaSection(draft, onChange, onAssetAdded, onVoice)
 
     if (fullNote) NoteEditorDialog(draft.title, draft.note, diary.templates, onDone = { t, n -> onChange(draft.copy(title = t, note = n)); fullNote = false }, onEditTemplates = { fullNote = false; onOpenSetup("templates") })
 
@@ -657,7 +660,7 @@ fun NoteEditorDialog(title: String, note: String, templates: List<Template>, onD
 /** Fotos (Kamera, Galerie) und Sprachnotizen des Eintrags. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MediaSection(draft: EntryDraft, onChange: (EntryDraft) -> Unit, onAssetAdded: (String) -> Unit) {
+private fun MediaSection(draft: EntryDraft, onChange: (EntryDraft) -> Unit, onAssetAdded: (String) -> Unit, onVoice: () -> Unit) {
     val env = LocalEnv.current
     val context = LocalContext.current
     val current = rememberUpdatedState(draft)
@@ -701,9 +704,7 @@ private fun MediaSection(draft: EntryDraft, onChange: (EntryDraft) -> Unit, onAs
 
     Panel(title = "Sprachnotiz", padding = 12.dp) {
         for (a in audios) AudioRow(a, env.assetFile(a)) { onChange(draft.copy(assetIds = draft.assetIds - a.id)) }
-        Recorder { name, durationMs ->
-            env.act { val a = assets.register(name, AssetType.AUDIO, System.currentTimeMillis(), durationMs); save(a); attach(a) }
-        }
+        OutlinedButton(onVoice, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Rounded.Mic, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Sprachnotiz aufnehmen") }
     }
 }
 
@@ -722,50 +723,6 @@ fun AudioRow(asset: Asset, file: File?, onRemove: (() -> Unit)?) {
         Text("Aufnahme · %d:%02d min".format(asset.durationMs / 60000, asset.durationMs / 1000 % 60), Modifier.weight(1f))
         if (onRemove != null) IconButton(onRemove, Modifier.size(48.dp)) { Icon(Icons.Rounded.DeleteOutline, "Aufnahme entfernen") }
     }
-}
-
-@Composable
-private fun Recorder(onRecorded: (String, Long) -> Unit) {
-    val env = LocalEnv.current
-    val context = LocalContext.current
-    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
-    var target by remember { mutableStateOf<Pair<String, File>?>(null) }
-    var startedAt by remember { mutableLongStateOf(0L) }
-    var error by remember { mutableStateOf("") }
-
-    fun start() {
-        error = ""
-        val container = (context.applicationContext as? de.mediclever.tagebuch.TagebuchApp)?.container ?: return
-        val t = container.assets.newFile(System.currentTimeMillis(), "m4a")
-        val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
-        runCatching {
-            r.setAudioSource(MediaRecorder.AudioSource.MIC)
-            r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            r.setAudioEncodingBitRate(64_000); r.setAudioSamplingRate(44_100)
-            r.setOutputFile(t.second.absolutePath)
-            r.prepare(); r.start()
-        }.onSuccess { recorder = r; target = t; startedAt = System.currentTimeMillis() }
-            .onFailure { r.release(); t.second.delete(); error = "Die Aufnahme konnte nicht gestartet werden." }
-    }
-    fun stop() {
-        val r = recorder ?: return
-        val t = target
-        val ok = runCatching { r.stop() }.isSuccess
-        r.release(); recorder = null; target = null
-        if (ok && t != null && t.second.length() > 0) onRecorded(t.first, System.currentTimeMillis() - startedAt) else t?.second?.delete()
-    }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) start() else error = "Ohne Zugriff auf das Mikrofon ist keine Aufnahme möglich."
-    }
-    DisposableEffect(Unit) { onDispose { recorder?.let { runCatching { it.stop() }; it.release() }; target?.second?.delete() } }
-
-    if (recorder == null) OutlinedButton({
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) start()
-        else permission.launch(Manifest.permission.RECORD_AUDIO)
-    }, Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Mic, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Aufnahme starten") }
-    else Button({ stop() }, Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Stop, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Aufnahme beenden und anhängen") }
-    if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
 }
 
 @Suppress("unused") private fun unusedContext(c: Context) = c

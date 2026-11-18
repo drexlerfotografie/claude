@@ -18,4 +18,10 @@ class EntryShots : ShotBase() {
         val e = d.entries.first()
         EntryEditScreen(EntryDraft.from(e, listOf(d.goals[1].id)), {}, {})
     }
+
+    @Test fun voiceReview() = shot("sprachnotiz") {
+        val text = "Dritter Nachtdienst, ziemlich müde. Das Team war super. Nach dem Dienst noch kurz laufen gewesen."
+        val hits = de.mediclever.tagebuch.core.voice.VoiceMatcher.suggest(text, SampleData.diary)
+        de.mediclever.tagebuch.ui.entry.VoiceReview(text, {}, 24_000, null, hits, { it.sure }, {}, auto = false, onAuto = {}, waiting = false, recognitionAvailable = true, onApply = {}, onDismiss = {})
+    }
 }
