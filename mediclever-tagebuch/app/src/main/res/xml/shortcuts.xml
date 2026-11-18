@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lange auf das App-Symbol druecken: direkt in die Sprachnotiz oder in einen neuen Eintrag -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="einsprechen" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_voice" android:shortcutLongLabel="@string/shortcut_voice_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.mediclever.tagebuch" android:targetClass="de.mediclever.tagebuch.MainActivity">
+            <extra android:name="route" android:value="entry/new?date=&amp;score=0&amp;voice=true" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="eintrag" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_entry" android:shortcutLongLabel="@string/shortcut_entry_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.mediclever.tagebuch" android:targetClass="de.mediclever.tagebuch.MainActivity">
+            <extra android:name="route" android:value="entry/new?date=&amp;score=0&amp;voice=false" />
+        </intent>
+    </shortcut>
+</shortcuts>
