@@ -28,6 +28,10 @@ object SampleData {
             d.copy(moods = d.moods + Mood(level = 2, name = "Zufrieden", icon = "b", sortOrder = 1))
         }
         val moodsByLevel = base.moods.groupBy { it.level }
+        // Dienste folgen einem festen Plan, damit Bloecke und freie Tage vorkommen
+        val shiftTags = base.groups.first { it.name == "Dienst" }.let { g -> base.tags.filter { it.groupId == g.id } }
+        val other = base.tags - shiftTags.toSet()
+        val plan = listOf("Frühdienst", "Frühdienst", "Spätdienst", "Spätdienst", "Nachtdienst", "Nachtdienst", "Nachtdienst", "Frei", "Frei")
         val entries = mutableListOf<Entry>()
         val checks = mutableListOf<GoalCheck>()
         val sport = base.tags.first { it.name == "Sport" }
@@ -42,9 +46,12 @@ object SampleData {
             if (!skip) {
                 val count = if (rnd.nextInt(100) < 12) 2 else 1
                 repeat(count) { k ->
-                    val level = listOf(1, 2, 2, 2, 3, 3, 4, 2, 1, 5, 3, 2)[rnd.nextInt(12)]
+                    val planIndex = Math.floorMod(day.toEpochDay().toInt(), plan.size)
+                    // im Nachtblock sinkt der Wert von Nacht zu Nacht, am ersten freien Tag ist er am tiefsten
+                    val strain = when (planIndex) { 5 -> 1; 6 -> 1; 7 -> 2; else -> 0 }
+                    val level = (listOf(1, 2, 2, 2, 3, 3, 4, 2, 1, 5, 3, 2)[rnd.nextInt(12)] + strain).coerceAtMost(5)
                     val mood = moodsByLevel.getValue(level).let { it[rnd.nextInt(it.size)] }
-                    val tags = base.tags.shuffled(rnd).take(2 + rnd.nextInt(4)).map { it.id }
+                    val tags = other.shuffled(rnd).take(2 + rnd.nextInt(4)).map { it.id } + shiftTags.first { it.name == plan[planIndex] }.id
                     val values = base.scales.mapNotNull { s ->
                         if (rnd.nextInt(100) < 20) null else when (s.type) {
                             ScaleType.TEXT -> ScaleValue(s.id, pointId = s.points[(s.points.size - level + rnd.nextInt(2)).coerceIn(0, s.points.size - 1)].id)

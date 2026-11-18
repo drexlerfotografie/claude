@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +31,7 @@ import de.mediclever.tagebuch.ui.icons.MoodFace
 import de.mediclever.tagebuch.ui.setup.verticalScrollCompat
 import de.mediclever.tagebuch.ui.theme.LocalDiaryColors
 import de.mediclever.tagebuch.ui.theme.onColor
+import de.mediclever.tagebuch.ui.theme.groupColor
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -50,6 +52,8 @@ fun CalendarTab(month: YearMonth) {
     val filter = CalendarFilter(moodIds = moodIds.toSet(), tagIds = tagIds.toSet())
     val cal = remember(diary, month, env.today, moodIds, tagIds) { calendarMonth(diary, month, env.today, filter = filter) }
     val filtering = moodIds.isNotEmpty() || tagIds.isNotEmpty()
+    val levels = remember(diary, month) { de.mediclever.tagebuch.core.stats.dayLevels(diary, de.mediclever.tagebuch.core.stats.DateRange(month.atDay(1), month.atEndOfMonth())) }
+    val shifts = remember(diary, month) { (1..month.lengthOfMonth()).mapNotNull { d -> month.atDay(d).let { day -> de.mediclever.tagebuch.core.shift.Shifts.ofDay(diary, day)?.let { day to it } } }.toMap() }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -67,7 +71,7 @@ fun CalendarTab(month: YearMonth) {
                     val label = fmtDayShort(day.date) + when { day.entryCount == 0 -> ", kein Eintrag"; else -> ", ${plural(day.entryCount, "Eintrag", "Einträge")}" + (day.level?.let { ", " + levelName(it) } ?: "") }
                     Column(
                         Modifier.weight(1f).aspectRatio(0.85f).clip(RoundedCornerShape(12.dp))
-                            .then(if (c != null) Modifier.background(c.copy(alpha = if (dimmed) 0.2f else 1f)) else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)))
+                            .then(if (c != null) (dayBrush(levels[day.date].orEmpty()).takeIf { !filtering }?.let { Modifier.background(it) } ?: Modifier.background(c.copy(alpha = if (dimmed) 0.2f else 1f))) else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)))
                             .then(if (day.isToday) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(12.dp)) else Modifier)
                             .clickable(enabled = !day.isFuture) { if (day.entryCount == 0) nav.go(Routes.newEntry(day.date.toString())) else dayOpen = day.date }
                             .semantics(mergeDescendants = true) { contentDescription = label },
@@ -77,16 +81,26 @@ fun CalendarTab(month: YearMonth) {
                         Text(day.date.dayOfMonth.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = if (day.isToday) FontWeight.Black else FontWeight.SemiBold, color = fg, modifier = Modifier.alpha(if (day.isFuture) 0.4f else 1f))
                         if (day.entryCount == 0 && !day.isFuture) Icon(Icons.Rounded.Add, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         // Symbol der Stufe, damit der Tag nicht nur an der Farbe erkennbar ist
-                        else if (day.level != null) MoodFace(day.level!!, "a", 20.dp, Modifier.alpha(if (dimmed) 0.3f else 1f))
+                        else shifts[day.date]?.let { t ->
+                            // Streifen in der Farbe der Dienstart
+                            Box(Modifier.padding(top = 4.dp).width(22.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.85f)).padding(1.dp).clip(RoundedCornerShape(2.dp)).background(groupColor(t.colorIndex ?: diary.groupById[t.groupId]?.colorIndex)).alpha(if (dimmed) 0.3f else 1f))
+                        }
                     }
                 }
             }
         }
+        val legend = shifts.values.distinctBy { it.id }.sortedBy { it.sortOrder }
+        if (legend.isNotEmpty()) FlowRow(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (t in legend) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Box(Modifier.width(16.dp).height(6.dp).clip(RoundedCornerShape(3.dp)).background(groupColor(t.colorIndex ?: diary.groupById[t.groupId]?.colorIndex)))
+                Text(de.mediclever.tagebuch.core.shift.Shifts.short(diary, t), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         if (cal.hint.isNotBlank()) Text(cal.hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp))
-        Panel(title = if (filtering) "Stimmungen der passenden Einträge" else "Stimmungen im ${fmtMonth(month)}", padding = 12.dp) {
+        Panel(title = if (filtering) "Werte der passenden Einträge" else "Werte im ${fmtMonth(month)}", padding = 12.dp) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 for (l in cal.moodCounter.byLevel) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    MoodFace(l.level, diary.moods.firstOrNull { it.level == l.level }?.icon ?: "a", 34.dp, muted = l.count == 0)
+                    colors.level(l.level).let { c -> Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (l.count == 0) MaterialTheme.colorScheme.surfaceVariant else c), contentAlignment = Alignment.Center) { Text((6 - l.level).toString(), color = if (l.count == 0) MaterialTheme.colorScheme.onSurfaceVariant else onColor(c), fontWeight = FontWeight.Black) } }
                     Text(l.count.toString(), style = MaterialTheme.typography.titleMedium)
                     Text(diary.moods.firstOrNull { it.level == l.level }?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }

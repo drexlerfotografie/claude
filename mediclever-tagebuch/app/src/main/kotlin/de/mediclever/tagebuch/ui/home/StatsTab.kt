@@ -44,6 +44,7 @@ fun StatsTab(month: YearMonth) {
     var bars by rememberSaveable { mutableStateOf(false) }
     var allActivities by rememberSaveable { mutableStateOf(false) }
     var togetherLevel by rememberSaveable { mutableIntStateOf(1) }
+    var showAll by rememberSaveable { mutableStateOf(diary.settings.detail == de.mediclever.tagebuch.core.model.Detail.ALLES) }
     val s: PeriodStats = remember(diary, month, yearly, overlay, env.today) {
         if (yearly) yearStats(diary, month.year, env.today, overlay).stats else monthStats(diary, month, env.today, overlay).stats
     }
@@ -73,6 +74,25 @@ fun StatsTab(month: YearMonth) {
         if (!s.enoughData.any) {
             EmptyState("Zu wenig Daten", "Für diesen Zeitraum gibt es noch keine Einträge. Sobald du ein paar Tage festgehalten hast, erscheinen hier deine Auswertungen.",
                 actionLabel = "Eintrag anlegen", onAction = { nav.go(Routes.newEntry()) })
+            return@Column
+        }
+
+        if ("schicht" in diary.settings.modules) ShiftPanels(s, period)
+
+        // In der kompakten und normalen Stufe liegt alles Weitere hinter einem Knopf
+        if (!showAll) {
+            val scales = s.scales.filter { it.average != null }
+            if (scales.isNotEmpty()) Panel(title = "Deine Skalen $period", padding = 14.dp) {
+                for (sc in scales) Row(Modifier.fillMaxWidth()) {
+                    Text(sc.scale.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                    Text(if (sc.scale.type == ScaleType.DURATION) fmtDuration(sc.average!!.toInt()) else num(sc.average!!), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black)
+                    sc.change?.takeIf { sc.scale.type != ScaleType.DURATION && kotlin.math.abs(it) >= 0.05 }?.let { c ->
+                        Text("  " + signed(c), style = MaterialTheme.typography.bodyLarge, color = when (sc.changeRating) { ChangeRating.GOOD -> MaterialTheme.colorScheme.tertiary; ChangeRating.BAD -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurfaceVariant })
+                    }
+                }
+            }
+            OutlinedButton({ showAll = true }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Alle Auswertungen anzeigen", fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(24.dp))
             return@Column
         }
 

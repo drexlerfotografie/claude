@@ -48,15 +48,26 @@ fun EntryCard(
     val level = mood?.level ?: 3
     var menu by remember { mutableStateOf(false) }
     val date = LocalDate.parse(entry.localDate)
+    val shift = de.mediclever.tagebuch.core.shift.Shifts.of(diary, entry)
 
     Panel(modifier, onClick = onOpen, padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MoodFace(level, mood?.icon ?: "a", size = 46.dp)
+            // Der Tageswert als Zahl im Farbfeld (5 ist der beste)
+            LocalDiaryColors.current.level(level).let { c ->
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(c), contentAlignment = Alignment.Center) {
+                    Text((6 - level).toString(), color = de.mediclever.tagebuch.ui.theme.onColor(c), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                }
+            }
             Column(Modifier.weight(1f)) {
                 if (showDate) Text(fmtDay(date, env.today), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(mood?.name ?: "Unbekannt", style = MaterialTheme.typography.titleLarge, color = if (LocalDiaryColors.current.dark) MaterialTheme.colorScheme.onSurface else LocalDiaryColors.current.level(level).let { c -> androidx.compose.ui.graphics.lerp(c, MaterialTheme.colorScheme.onSurface, 0.35f) })
                     Text(fmtTime(entry.minuteOfDay), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+                    shift?.let { t ->
+                        val c = groupColor(t.colorIndex ?: diary.groupById[t.groupId]?.colorIndex)
+                        Text(de.mediclever.tagebuch.core.shift.Shifts.short(diary, t), Modifier.padding(bottom = 2.dp).clip(RoundedCornerShape(6.dp)).background(c).padding(horizontal = 7.dp, vertical = 2.dp),
+                            color = de.mediclever.tagebuch.ui.theme.onColor(c), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
                 }
             }
             if (entry.favorite) Icon(Icons.Rounded.Star, "Favorit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
@@ -71,7 +82,7 @@ fun EntryCard(
             }
         }
 
-        val tags = entry.tagIds.mapNotNull { diary.tagById[it] }
+        val tags = entry.tagIds.mapNotNull { diary.tagById[it] }.filter { it.id != shift?.id }
         if (tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             for (t in tags) MiniChip(t.name, t.icon, groupColor(t.colorIndex ?: diary.groupById[t.groupId]?.colorIndex))
         }
