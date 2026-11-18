@@ -122,7 +122,7 @@ class AppFlowTest {
         rule.onNodeWithContentDescription("Start").performClick(); rule.waitForIdle()
         rule.onNodeWithText("Wie war dein Tag?").assertExists()
         rule.onNodeWithContentDescription("Menü").performClick(); rule.waitForIdle()
-        for (row in listOf("Dienstarten", "Ziele", "Berichte", "Rückblick", "Wichtige Tage", "Favoriten", "Fotos", "Erfolge", "Einrichtung", "Erinnerungen", "Aussehen", "Sicherheit", "Einstellungen", "Daten", "MediClever-Konto", "Über die App")) {
+        for (row in listOf("Dienstarten", "Typ und Tonfall", "Stichwörter", "Ziele", "Berichte", "Rückblick", "Wichtige Tage", "Favoriten", "Fotos", "Erfolge", "Einrichtung", "Erinnerungen", "Aussehen", "Sicherheit", "Einstellungen", "Daten", "MediClever-Konto", "Über die App")) {
             rule.onNodeWithText(row).performScrollTo().performClick()
             rule.waitForIdle()
             rule.onAllNodesWithContentDescription("Zurück").onLast().assertExists("Seite $row hat keinen Zurück-Pfeil")
@@ -130,6 +130,23 @@ class AppFlowTest {
             rule.waitForIdle()
             rule.onNodeWithText("Dein Tagebuch", ignoreCase = true).assertExists()
         }
+    }
+
+    @Test fun typeIsFreeAndSingleChangesNeedPlus() {
+        onboard("Allgemein")
+        rule.onNodeWithContentDescription("Menü").performClick()
+        rule.onNodeWithText("Typ und Tonfall").performScrollTo().performClick()
+        rule.onNodeWithText("Analytisch").performClick()
+        waitFor("Typ gespeichert") { runBlocking { container.prefs.current() }.settings.let { it.userType.name == "ANALYTISCH" && it.detail.name == "ALLES" && it.tone.name == "SACHLICH" } }
+        // ohne Plus aendert ein Tipp auf den Tonfall nichts und zeigt, was Plus kann
+        rule.onNodeWithText("Cleverle").performScrollTo().performClick()
+        waitText("Plus einschalten")
+        assertEquals("SACHLICH", runBlocking { container.prefs.current() }.settings.tone.name)
+        rule.onNodeWithText("Plus einschalten").performClick()
+        waitFor("Plus an") { runBlocking { container.prefs.current() }.plus }
+        rule.onAllNodesWithContentDescription("Zurück").onLast().performClick()
+        rule.onNodeWithText("Cleverle").performScrollTo().performClick()
+        waitFor("Tonfall gespeichert") { runBlocking { container.prefs.current() }.settings.tone.name == "CLEVERLE" }
     }
 
     @Test fun goalCanBeCreatedAndCheckedToday() {

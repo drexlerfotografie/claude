@@ -1,5 +1,6 @@
 package de.mediclever.tagebuch.ui.home
 
+import androidx.compose.material3.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +38,10 @@ fun MoreTab() {
         RowGroup {
             SettingRow("Dienstarten", "Welche Dienste es bei dir gibt", Icons.Rounded.WorkHistory, onClick = { nav.go(Routes.SHIFTS) })
             RowDivider()
+            SettingRow("Typ und Tonfall", "Detailtiefe, Reihenfolge, Startseite", Icons.Rounded.Person, onClick = { nav.go(Routes.PERSONAL) })
+            RowDivider()
+            SettingRow("Stichwörter", "Vorschläge aus der Sprachnotiz", Icons.Rounded.Mic, onClick = { nav.go(Routes.KEYWORDS) })
+            RowDivider()
             SettingRow("Einrichtung", "Stimmungen, Aktivitäten, Skalen, Vorlagen", Icons.Rounded.Tune, onClick = { nav.go(Routes.setup()) })
             RowDivider()
             SettingRow("Erinnerungen", "Uhrzeiten mit eigenem Text", Icons.Rounded.Notifications, onClick = { nav.go(Routes.REMINDERS) })
@@ -54,6 +59,15 @@ fun MoreTab() {
             SettingRow("MediClever-Konto", "Anmelden und zwischen Geräten abgleichen", Icons.Rounded.AccountCircle, onClick = { nav.go(Routes.ACCOUNT) })
             RowDivider()
             SettingRow("Über die App", "Datenschutz, Lizenzen, Version", Icons.Rounded.Info, onClick = { nav.go(Routes.ABOUT) })
+        }
+        Surface(onClick = { nav.go(Routes.PLUS) }, shape = MaterialTheme.shapes.medium, color = de.mediclever.tagebuch.ui.theme.Brand.RichBlack, contentColor = androidx.compose.ui.graphics.Color.White, modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("MediClever Tagebuch Plus", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Black)
+                    Text(if (LocalEnv.current.local.plus) "Eingeschaltet" else "Tonfall, Reihenfolge und Startseite selbst bestimmen", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFFC9CED4))
+                }
+                Icon(Icons.Rounded.ChevronRight, null)
+            }
         }
         Spacer(Modifier.height(24.dp))
     }

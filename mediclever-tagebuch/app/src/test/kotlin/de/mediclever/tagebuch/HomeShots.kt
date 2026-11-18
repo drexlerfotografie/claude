@@ -25,4 +25,10 @@ class StatsShots : ShotBase() {
     @Test fun statsEmpty() = shot("statistiken_leer", Diary(moods = StarterPacks.defaultMoods())) { HomeScreen(startTab = 1) }
     @Test fun calendar() = shot("kalender") { HomeScreen(startTab = 2) }
     @Test fun calendarWithGaps() = shot("kalender_luecken") { HomeScreen(startTab = 2, startMonth = YearMonth.of(2026, 8)) }
+
+    @Test fun personal() = shot("typ_tonfall") { de.mediclever.tagebuch.ui.more.PersonalScreen() }
+    @Test fun plus() = shot("plus") { de.mediclever.tagebuch.ui.more.PlusScreen() }
+    @Test fun keywords() = shot("stichwoerter") { de.mediclever.tagebuch.ui.more.KeywordsScreen(SampleData.diary.tags.first { it.name == "Sport" }.id) }
+    @Test fun startCleverle() = shot("start_cleverle", SampleData.diary.let { it.copy(settings = it.settings.copy(tone = de.mediclever.tagebuch.core.model.Tone.CLEVERLE,
+        startBlocks = listOf("line", "scales", "matrix", "goals"))) }) { de.mediclever.tagebuch.ui.home.StartScreen() }
 }

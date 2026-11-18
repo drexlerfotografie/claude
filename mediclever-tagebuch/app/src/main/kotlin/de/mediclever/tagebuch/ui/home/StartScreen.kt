@@ -32,6 +32,15 @@ import de.mediclever.tagebuch.core.model.ScaleType
 import de.mediclever.tagebuch.core.model.ScaleValue
 import de.mediclever.tagebuch.core.model.StartBlocks
 import de.mediclever.tagebuch.core.stats.DateRange
+import de.mediclever.tagebuch.core.stats.dayStreak
+import de.mediclever.tagebuch.core.tone.Lines
+import de.mediclever.tagebuch.core.model.Tone
+import de.mediclever.tagebuch.core.goals.GoalState
+import de.mediclever.tagebuch.core.goals.goalsToday
+import de.mediclever.tagebuch.R
+import de.mediclever.tagebuch.ui.theme.Brand
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import de.mediclever.tagebuch.core.stats.dayLevels
 import de.mediclever.tagebuch.core.stats.weekOf
 import de.mediclever.tagebuch.ui.*
@@ -78,7 +87,26 @@ fun StartScreen() {
             for (block in diary.settings.startBlocks) when (block) {
                 StartBlocks.SCALES -> ScaleTiles(diary)
                 StartBlocks.MATRIX -> MonthMatrix(month, today, levels, diary.settings.weekStart, diary.entries.map { it.localDate }.toSet()) { nav.go(Routes.section(2)) }
-                StartBlocks.LINE -> startLine(diary, today, levels)?.let { Text(it, Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface) }
+                StartBlocks.LINE -> startLine(diary, today, levels)?.let { line ->
+                    if (diary.settings.tone == Tone.CLEVERLE) Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Image(painterResource(R.drawable.cleverle), null, Modifier.size(52.dp))
+                        Surface(color = if (LocalDiaryColors.current.dark) Color(0xFF2A3947) else Brand.RichBlack, contentColor = Color.White, shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp), modifier = Modifier.weight(1f)) {
+                            Text(line, Modifier.padding(horizontal = 14.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    } else Text(line, Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                }
+                StartBlocks.GOALS -> {
+                    val goals = remember(diary, today) { goalsToday(diary, today) }
+                    if (goals.isNotEmpty()) Panel(onClick = { nav.go(Routes.GOALS) }, padding = 12.dp) {
+                        val done = goals.count { it.state == GoalState.DONE }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ziele heute", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                            Text("$done von ${goals.size}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                        }
+                        goals.firstOrNull { it.state == GoalState.OPEN }?.let { Text("Offen: ${it.goal.name}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+                StartBlocks.LAST -> diary.entries.firstOrNull()?.let { e -> EntryCard(e, onOpen = { nav.go(Routes.editEntry(e.id)) }) }
             }
             Spacer(Modifier.height(4.dp))
         }
@@ -86,18 +114,18 @@ fun StartScreen() {
     if (newSheet) NewSheet { newSheet = false }
 }
 
-/** Ein Satz zur Woche: der Schnitt dieser Woche gegen die letzte. */
+/** Der eine Satz der Startseite im gewaehlten Tonfall. */
 fun startLine(diary: Diary, today: LocalDate, levels: Map<LocalDate, List<Int>>): String? {
     val week = weekOf(today, diary.settings.weekStart)
     fun avg(days: List<LocalDate>, source: Map<LocalDate, List<Int>>) = days.flatMap { source[it].orEmpty() }.map { 6 - it }.takeIf { it.isNotEmpty() }?.average()
-    val now = avg(week, levels) ?: return null
     val before = week.map { it.minusDays(7) }
-    val last = avg(before, dayLevels(diary, DateRange(before.first(), before.last()))) ?: return null
-    return when {
-        now - last >= 0.25 -> "Diese Woche bisher besser als die letzte."
-        last - now >= 0.25 -> "Diese Woche bisher schwerer als die letzte."
-        else -> "Diese Woche bisher ähnlich wie die letzte."
-    }
+    val latest = diary.entries.firstOrNull()
+    val input = Lines.Input(
+        week = avg(week, levels), lastWeek = avg(before, dayLevels(diary, DateRange(before.first(), before.last()))),
+        daysSinceEntry = latest?.let { java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(it.localDate), today).toInt().coerceAtLeast(0) },
+        streak = dayStreak(diary, today).current, lastScore = latest?.let { diary.levelOf(it) }?.let { 6 - it }, entryCount = diary.entries.size,
+    )
+    return Lines.start(input, diary.settings.tone, diary.settings.cleverleHints)
 }
 
 /** Die Skalen der Startseite: die gewaehlten, sonst die ersten drei. */

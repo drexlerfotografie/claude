@@ -46,6 +46,10 @@ fun AppNav(startRoute: String? = null, presetLevel: Int? = null, onRouteConsumed
             }
             composable("setup?section={section}", arguments = listOf(navArgument("section") { type = NavType.StringType; defaultValue = "" })) { SetupScreen(it.arguments?.getString("section").orEmpty()) { nav.popBackStack() } }
             composable(Routes.SHIFTS) { ShiftsScreen() }
+            composable(Routes.PERSONAL) { PersonalScreen() }
+            composable(Routes.PLUS) { PlusScreen() }
+            composable(Routes.KEYWORDS) { KeywordsListScreen() }
+            composable("keywords/{id}") { KeywordsScreen(it.arguments?.getString("id").orEmpty()) }
             composable(Routes.GOALS) { GoalsScreen() }
             composable("goal/edit?id={id}", arguments = listOf(navArgument("id") { type = NavType.StringType; defaultValue = "" })) { GoalEditScreen(it.arguments?.getString("id")?.ifEmpty { null }) }
             composable("goal/{id}") { GoalDetailScreen(it.arguments?.getString("id").orEmpty()) }

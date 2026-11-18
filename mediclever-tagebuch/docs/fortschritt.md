@@ -31,3 +31,25 @@
 - Ein Ziel mit verknüpfter Aktivität lässt sich an einem Tag nicht abwählen, solange ein Eintrag die Aktivität enthält.
 - Monatliche Ziele aus dem Import werden zu „einmal pro Woche“.
 - Erinnerungen können wenige Minuten später kommen (kein Sonderrecht für exakte Wecker).
+
+## Stand 18.11.2026 – Version 0.4.0: neue Bedienung nach den Entwürfen F bis I
+Umgesetzt und automatisch geprüft:
+- Startseite mit Barometer, Ring der laufenden Woche, Skalen-Kacheln, Monatsmatrix (geteilt bei zwei Einträgen, Verlauf ab drei), einem Satz im gewählten Tonfall, optional Ziele und letzter Eintrag
+- Leiste überall gleich: Start, Einträge, Einsprechen, Auswertung, Menü
+- Eintrag: Wert klein oben rechts, Dienstart (genau eine), Skalen als Zeilen, Aktivitäten mit „Alle Aktivitäten“, Notiz; Reihenfolge einstellbar
+- Dienstarten: ein- und ausschalten, eigene anlegen, Vorlagen, Kurzname, freiwillige Zeiten
+- Auswertung: das Wichtigste, Wert nach Dienstart, Verlauf im Dienstblock; alles Weitere hinter einem Knopf
+- Kalender mit Dienststreifen, Eintragsliste mit Zahlfeld und Dienstmarke
+- Sprachnotiz: Aufnahme und Text, Vorschläge für Dienstart, Aktivitäten und Skalen nach festen Regeln, eigene Stichwörter und Sperrwörter, Lernen aus Ablehnungen
+- Typ (frei), Detailtiefe, Tonfall mit Cleverle, Reihenfolge, Startseite anpassen (Plus), Plus als Schalter für die Testphase
+
+Nur auf einem echten Gerät prüfbar, bisher ungeprüft:
+- Sprachnotiz: Aufnahme (WAV, 16 kHz) und gleichzeitige Spracherkennung über `RecognizerIntent.EXTRA_AUDIO_SOURCE` (ab Android 13). Ob die Spracherkennung des Geräts den Tonstrom annimmt, hängt vom Gerät ab. Ohne Erkennung bleibt die Aufnahme, der Text wird getippt.
+- Ziehen am Barometer auf der Startseite, Dialog zum Ändern des Werts
+
+Offen:
+- Start über Widget und Assistent direkt in die Sprachnotiz
+- Verstärker („sehr“, „etwas“) bei Skalen aus Sprache
+- Dienstart aus hinterlegten Zeiten vorwählen
+- Plus als echter Kauf (Play Billing)
+- Module außer Schichtdienst
