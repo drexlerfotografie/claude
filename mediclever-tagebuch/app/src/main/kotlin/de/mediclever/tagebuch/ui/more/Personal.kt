@@ -152,6 +152,10 @@ fun PersonalScreen() {
                 for (sc in scales) FilterChip(sc.id in chosen, { gated { st -> st.copy(startScaleIds = if (sc.id in chosen) chosen - sc.id else (chosen + sc.id).takeLast(3)) } }, label = { Text(sc.name) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
+        Head("Module")
+        RowGroup {
+            SwitchRow("Schichtdienst", "Dienstart im Eintrag, Auswertung nach Dienstart und Dienstblock", checked = "schicht" in s.modules, onChange = { on -> change { it.copy(modules = if (on) (it.modules + "schicht").distinct() else it.modules - "schicht") } })
+        }
         if (!plus) Button({ nav.go(Routes.PLUS) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Was Plus kann") }
     }
 }

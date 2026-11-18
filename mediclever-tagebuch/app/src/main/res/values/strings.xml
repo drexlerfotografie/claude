@@ -3,4 +3,8 @@
     <string name="app_name">MediClever Tagebuch</string>
     <string name="widget_name">Stimmung eintragen</string>
     <string name="widget_description">Fünf Stufen zum Antippen und deine Tage in Folge</string>
+    <string name="shortcut_voice">Einsprechen</string>
+    <string name="shortcut_voice_long">Sprachnotiz aufnehmen</string>
+    <string name="shortcut_entry">Neuer Eintrag</string>
+    <string name="shortcut_entry_long">Neuen Eintrag anlegen</string>
 </resources>

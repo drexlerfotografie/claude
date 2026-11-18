@@ -50,6 +50,9 @@ class AppFlowTest {
         assertTrue(d.tags.any { it.name == "Nachtdienst" })
         assertTrue(d.scales.any { it.name == "Schlafdauer" })
         assertTrue(runBlocking { container.prefs.current() }.consentAt > 0)
+        // das Paket fuer Schichtdienst schaltet das Modul ein, der Typ bleibt beim Standard
+        assertEquals(listOf("schicht"), runBlocking { container.prefs.current() }.settings.modules)
+        assertEquals("AUSGEWOGEN", runBlocking { container.prefs.current() }.settings.userType.name)
         rule.onRoot().captureRoboImage("build/shots/ablauf_nach_einrichtung.png")
     }
 
@@ -134,6 +137,8 @@ class AppFlowTest {
 
     @Test fun typeIsFreeAndSingleChangesNeedPlus() {
         onboard("Allgemein")
+        // ohne Schichtpaket bleibt das Modul aus
+        assertEquals(emptyList<String>(), runBlocking { container.prefs.current() }.settings.modules)
         rule.onNodeWithContentDescription("Menü").performClick()
         rule.onNodeWithText("Typ und Tonfall").performScrollTo().performClick()
         rule.onNodeWithText("Analytisch").performClick()

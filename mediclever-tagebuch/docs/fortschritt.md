@@ -48,7 +48,7 @@ Nur auf einem echten Gerät prüfbar, bisher ungeprüft:
 - Ziehen am Barometer auf der Startseite, Dialog zum Ändern des Werts
 
 Offen:
-- Start über Widget und Assistent direkt in die Sprachnotiz
+- Start über Assistent direkt in die Sprachnotiz; das Widget hat noch keinen Mikrofonknopf (Kurzbefehl am App-Symbol ist da)
 - Verstärker („sehr“, „etwas“) bei Skalen aus Sprache
 - Dienstart aus hinterlegten Zeiten vorwählen
 - Plus als echter Kauf (Play Billing)

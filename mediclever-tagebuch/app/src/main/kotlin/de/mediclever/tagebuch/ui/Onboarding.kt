@@ -30,6 +30,7 @@ fun OnboardingScreen(startStep: Int = 0) {
     var consent by rememberSaveable { mutableStateOf(false) }
     var adult by rememberSaveable { mutableStateOf(false) }
     var pack by rememberSaveable { mutableStateOf("schichtdienst") }
+    var type by rememberSaveable { mutableStateOf("AUSGEWOGEN") }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -59,6 +60,11 @@ fun OnboardingScreen(startStep: Int = 0) {
                         }
                     }
                 }
+                Text("Wie viel möchtest du sehen?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                for (row in de.mediclever.tagebuch.core.model.UserType.entries.chunked(2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (t in row) FilterChip(type == t.name, { type = t.name }, label = { Text(de.mediclever.tagebuch.core.tone.Presets.title(t), Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp))
+                }
+                Text(de.mediclever.tagebuch.core.tone.Presets.hint(de.mediclever.tagebuch.core.model.UserType.valueOf(type)) + " Das lässt sich jederzeit im Menü ändern.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Du hast schon ein Tagebuch in einer anderen App? Starte leer und importiere es danach unter Mehr › Daten.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button({
                     env.act {
@@ -66,6 +72,8 @@ fun OnboardingScreen(startStep: Int = 0) {
                         // vorhandene Stimmungen (z. B. nach einem Abgleich) nicht verdoppeln
                         val have = snapshot().moods.any { !it.deleted }
                         save((if (have) emptyList() else d.moods) + d.groups + d.tags + d.scales + d.templates + d.reminders)
+                        // der Typ stellt Detailtiefe, Tonfall und Reihenfolge vor; Schichtdienst nur mit dem passenden Paket
+                        updateSettings { st -> de.mediclever.tagebuch.core.tone.Presets.apply(st, de.mediclever.tagebuch.core.model.UserType.valueOf(type)).copy(modules = if (pack == "schichtdienst") listOf("schicht") else emptyList()) }
                         prefs.setConsent(System.currentTimeMillis())
                         prefs.setOnboardingDone(true)
                     }
