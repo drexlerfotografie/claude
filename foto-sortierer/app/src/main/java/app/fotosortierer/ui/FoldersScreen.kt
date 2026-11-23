@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -16,10 +17,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
@@ -39,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.fotosortierer.core.Naming
 import java.io.File
 import java.time.LocalDate
 
@@ -66,6 +72,7 @@ private val SUGGESTIONS = listOf(
 fun FoldersScreen(vm: AppViewModel, modifier: Modifier) {
     var picker by remember { mutableStateOf<PickerMode?>(null) }
     var warning by remember { mutableStateOf<String?>(null) }
+    var newCategory by remember { mutableStateOf<String?>(null) }
     val root = vm.storageRoot
 
     Column(
@@ -128,9 +135,10 @@ fun FoldersScreen(vm: AppViewModel, modifier: Modifier) {
             }
         }
         val today = LocalDate.now()
+        val exampleCat = vm.categories.firstOrNull { it.startsWith("Urlaub") } ?: vm.categories.firstOrNull() ?: ""
         Text(
-            "Beispiel: ${shortPath(vm.targetRoot, root)}/${today.year}/" +
-                String.format("%04d_%02d_%02d", today.year, today.monthValue, today.dayOfMonth) + "_Rom_001.jpg",
+            "Beispiel: " + shortPath(Naming.dir(vm.targetRoot, today, exampleCat), root) + "/" +
+                Naming.fileName(Naming.prefix(today, "Gardasee"), 1, "jpg"),
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
@@ -139,6 +147,49 @@ fun FoldersScreen(vm: AppViewModel, modifier: Modifier) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        HorizontalDivider()
+
+        Text("Kategorien", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Werden pro Ereignis vorgeschlagen und bilden den Monatsordner, z. B. 2026_05_Arbeit. " +
+                "Die App lernt aus deinen Zuordnungen.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            vm.categories.forEach { c ->
+                InputChip(
+                    selected = false,
+                    onClick = {},
+                    label = { Text(c) },
+                    trailingIcon = {
+                        IconButton(onClick = { vm.removeCategory(c) }, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Default.Close, "Entfernen", Modifier.size(16.dp))
+                        }
+                    },
+                )
+            }
+            AssistChip(onClick = { newCategory = "" }, label = { Text("+ Kategorie") })
+        }
+
+        Text("Ereignisse", style = MaterialTheme.typography.titleMedium)
+        Text("Neues Ereignis nach einer Aufnahmepause von:", style = MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(1, 3, 6, 12).forEach { h ->
+                FilterChip(vm.gapHours == h, { vm.changeGapHours(h) }, { Text("$h Std.") })
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ortsnamen aus GPS vorschlagen")
+                Text(
+                    "Die Koordinaten der Fotos werden dafür an den Ortsdienst von Android (Google) geschickt. " +
+                        "Die Bilder selbst bleiben auf dem Handy.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(vm.usePlaces, vm::changeUsePlaces)
+        }
 
         if (vm.sources.isNotEmpty()) {
             OutlinedButton(onClick = vm::scan, modifier = Modifier.fillMaxWidth()) { Text("Jetzt einlesen") }
@@ -156,6 +207,15 @@ fun FoldersScreen(vm: AppViewModel, modifier: Modifier) {
                 if (mode == PickerMode.SOURCE) vm.addSource(path) else vm.changeTarget(path)
                 picker = null
             },
+        )
+    }
+    newCategory?.let { name ->
+        AlertDialog(
+            onDismissRequest = { newCategory = null },
+            title = { Text("Neue Kategorie") },
+            text = { OutlinedTextField(name, { newCategory = it }, singleLine = true, label = { Text("Name") }) },
+            confirmButton = { TextButton(onClick = { vm.addCategory(name); newCategory = null }) { Text("Hinzufügen") } },
+            dismissButton = { TextButton(onClick = { newCategory = null }) { Text("Abbrechen") } },
         )
     }
     warning?.let { w ->
@@ -227,7 +287,7 @@ private fun FolderPicker(
             onDismissRequest = { newName = null },
             title = { Text("Neuer Ordner") },
             text = {
-                androidx.compose.material3.OutlinedTextField(name, { newName = it }, singleLine = true, label = { Text("Name") })
+                OutlinedTextField(name, { newName = it }, singleLine = true, label = { Text("Name") })
             },
             confirmButton = {
                 TextButton(onClick = {

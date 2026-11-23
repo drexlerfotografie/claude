@@ -44,7 +44,9 @@ class EndToEndTest {
         File(camera, "kopie.jpg").writeBytes(ByteArray(3000) { 2 }) // Duplikat, Datum unsicher
         ApplicationProvider.getApplicationContext<Context>()
             .getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .edit().putString("sources", camera.path).commit()
+            .edit().putString("sources", camera.path).putInt("gapHours", 6).commit()
+        app.fotosortierer.data.AnalysisBackend.labeler = { _, _ -> emptyList() }
+        app.fotosortierer.data.AnalysisBackend.geocoder = { _, _, _ -> null }
     }
 
     @get:Rule
@@ -63,21 +65,23 @@ class EndToEndTest {
         rule.onNodeWithText("2023").performClick()
         rule.onAllNodesWithText("Sonntag, 05.11.2023").onFirst().assertExists()
         rule.onAllNodes(hasSetTextAction())[1].performTextInput("Urlaub Rom")
+        rule.onAllNodesWithText("Keine Kategorie")[1].performClick()
+        rule.onNodeWithText("Arbeit").performClick()
         rule.waitForIdle()
 
         rule.onNodeWithText("Vorschau für 4 Dateien").performClick()
         waitFor("4 Dateien → ", substring = true)
         rule.onNodeWithText("Verschieben").performClick()
         rule.onAllNodesWithText("Verschieben")[1].performClick() // Bestätigungsdialog
-        rule.waitUntil(10_000) { File(root, "Pictures/Sortiert/2023/2023_11_05_Urlaub_Rom_001.jpg").exists() }
-
         val year = File(root, "Pictures/Sortiert/2023")
-        val names = year.list()!!.sorted()
-        assertTrue(names.toString(), "2023_11_05_Urlaub_Rom_001.jpg" in names)
-        assertTrue(names.toString(), "2023_11_05_Urlaub_Rom_002.jpg" in names)
-        assertTrue(names.toString(), "2023_11_06_001.mp4" in names)
+        val work = File(year, "2023_11_Arbeit")
+        rule.waitUntil(10_000) { File(work, "2023_11_05_Urlaub_Rom_001.jpg").exists() }
+
+        val names = work.list()!!.sorted()
+        assertEquals(listOf("2023_11_05_Urlaub_Rom_001.jpg", "2023_11_05_Urlaub_Rom_002.jpg"), names)
+        assertTrue(File(year, "2023_11/2023_11_06_001.mp4").exists())
         // Morgens 9:00 muss vor 14:35 nummeriert sein
-        assertEquals(3000, File(year, "2023_11_05_Urlaub_Rom_001.jpg").length())
+        assertEquals(3000, File(work, "2023_11_05_Urlaub_Rom_001.jpg").length())
         assertFalse(File(camera, "IMG_20231105_143512.jpg").exists())
         waitFor("Alles sortiert.")
 
@@ -104,6 +108,6 @@ class EndToEndTest {
         rule.waitUntil(10_000) { File(camera, "IMG_20231105_143512.jpg").exists() }
         waitFor("rückgängig gemacht", substring = true)
         assertEquals(4, camera.list()!!.size)
-        assertFalse(year.exists()) // leerer Jahresordner wurde aufgeräumt
+        assertFalse(year.exists()) // leere Monats- und Jahresordner wurden aufgeräumt
     }
 }

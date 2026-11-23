@@ -82,21 +82,32 @@ class PlannerTest {
             listOf(Assignment(a, "Rom"), Assignment(b, "Rom"), Assignment(c, ""), Assignment(d, "Neujahr"))
         ).associate { it.item.name to it.target }
 
-        assertEquals("/s/Pictures/Sortiert/2026/2026_11_23_Rom_001.jpg", plan["a.JPEG"])
-        assertEquals("/s/Pictures/Sortiert/2026/2026_11_23_Rom_002.jpg", plan["b.jpg"])
-        assertEquals("/s/Pictures/Sortiert/2026/2026_11_23_001.mp4", plan["c.mp4"])
-        assertEquals("/s/Pictures/Sortiert/2025/2025_01_02_Neujahr_001.jpg", plan["d.jpg"])
+        assertEquals("/s/Pictures/Sortiert/2026/2026_11/2026_11_23_Rom_001.jpg", plan["a.JPEG"])
+        assertEquals("/s/Pictures/Sortiert/2026/2026_11/2026_11_23_Rom_002.jpg", plan["b.jpg"])
+        assertEquals("/s/Pictures/Sortiert/2026/2026_11/2026_11_23_001.mp4", plan["c.mp4"])
+        assertEquals("/s/Pictures/Sortiert/2025/2025_01/2025_01_02_Neujahr_001.jpg", plan["d.jpg"])
     }
 
     @Test fun continuesNumberingAndAvoidsCollisions() {
-        val existing = mapOf("/t/2026" to listOf("2026_11_23_Rom_001.jpg", "2026_11_23_Rom_005.jpg", "other.jpg"))
+        val existing = mapOf("/t/2026/2026_11" to listOf("2026_11_23_Rom_001.jpg", "2026_11_23_Rom_005.jpg", "other.jpg"))
         val x = item("/s/x.jpg", LocalDateTime.of(2026, 11, 23, 9, 0))
         val plan = Planner("/t") { existing[it].orEmpty() }.plan(listOf(Assignment(x, "Rom")))
-        assertEquals("/t/2026/2026_11_23_Rom_006.jpg", plan.single().target)
+        assertEquals("/t/2026/2026_11/2026_11_23_Rom_006.jpg", plan.single().target)
+    }
+
+    @Test fun categoryFolders() {
+        val x = item("/s/x.jpg", LocalDateTime.of(2026, 5, 24, 9, 0))
+        val y = item("/s/y.jpg", LocalDateTime.of(2026, 5, 24, 10, 0))
+        val plan = Planner("/t") { emptyList() }.plan(
+            listOf(Assignment(x, "Gardasee", "Urlaub & Ausflüge"), Assignment(y, "Gardasee", "Arbeit"))
+        ).associate { it.item.name to it.target }
+        assertEquals("/t/2026/2026_05_Urlaub_und_Ausflüge/2026_05_24_Gardasee_001.jpg", plan["x.jpg"])
+        // eigene Nummerierung pro Ordner
+        assertEquals("/t/2026/2026_05_Arbeit/2026_05_24_Gardasee_001.jpg", plan["y.jpg"])
     }
 
     @Test fun leavesAlreadySortedFilesAlone() {
-        val sorted = item("/t/2026/2026_11_23_Rom_001.jpg", LocalDateTime.of(2026, 11, 23, 9, 0))
+        val sorted = item("/t/2026/2026_11/2026_11_23_Rom_001.jpg", LocalDateTime.of(2026, 11, 23, 9, 0))
         val plan = Planner("/t") { listOf("2026_11_23_Rom_001.jpg") }.plan(listOf(Assignment(sorted, "Rom")))
         assertTrue(plan.isEmpty())
     }
@@ -121,4 +132,51 @@ class DuplicatesTest {
 
     private fun createTempDirSafe(): File =
         File(System.getProperty("java.io.tmpdir"), "dup" + System.nanoTime()).apply { mkdirs() }
+}
+
+
+class EventsTest {
+    private fun item(name: String, t: LocalDateTime, src: DateSource = DateSource.EXIF) =
+        MediaItem("/s/$name", 1, 0, false, t, src)
+
+    @Test fun splitsOnGapAndKeepsNightTogether() {
+        val items = listOf(
+            item("a", LocalDateTime.of(2026, 5, 24, 20, 0)),
+            item("b", LocalDateTime.of(2026, 5, 24, 22, 30)),
+            item("c", LocalDateTime.of(2026, 5, 25, 1, 0)), // über Mitternacht, < 3 h
+            item("d", LocalDateTime.of(2026, 5, 25, 9, 0)), // > 3 h Pause
+            item("w", LocalDateTime.of(2026, 5, 25, 0, 0), DateSource.FILENAME), // WhatsApp, nur Datum
+        )
+        val events = Events.group(items, 3)
+        assertEquals(listOf(listOf("a", "b"), listOf("w"), listOf("c"), listOf("d")), events.map { e -> e.items.map { it.name } })
+        assertEquals(listOf(listOf("a", "b", "c"), listOf("d")), Events.group(items.filter { it.name != "w" }, 3).map { e -> e.items.map { it.name } })
+    }
+}
+
+class SuggestTest {
+    private val cats = Suggest.DEFAULT_CATEGORIES
+    private fun item(path: String) = MediaItem(path, 1, 0, false, LocalDateTime.of(2026, 1, 1, 0, 0), DateSource.EXIF)
+
+    @Test fun screenshotsByRule() {
+        assertEquals("Dokumente & Screenshots", Suggest.category(listOf(item("/s/Pictures/Screenshots/Screenshot_1.png")), emptyList(), cats, emptyMap()))
+    }
+
+    @Test fun screenshotRuleOnlyChecksOwnFolder() {
+        assertEquals("Urlaub & Ausflüge", Suggest.category(listOf(item("/s/Screenshots/Alt/Urlaub/a.jpg")), listOf("beach"), cats, emptyMap()))
+    }
+
+    @Test fun keywordsAndLearning() {
+        assertEquals("Urlaub & Ausflüge", Suggest.category(listOf(item("/s/a.jpg")), listOf("beach", "sky"), cats, emptyMap()))
+        assertNull(Suggest.category(listOf(item("/s/a.jpg")), listOf("bag"), cats, emptyMap()))
+        // nach zwei Zuordnungen „bag“ → Arbeit
+        assertEquals("Arbeit", Suggest.category(listOf(item("/s/a.jpg")), listOf("bag"), cats, mapOf("bag" to mapOf("Arbeit" to 2))))
+        // Gelerntes schlägt Startwissen
+        assertEquals("Arbeit", Suggest.category(listOf(item("/s/a.jpg")), listOf("sky"), cats, mapOf("sky" to mapOf("Arbeit" to 3))))
+    }
+
+    @Test fun anlassWordsAndTopLabels() {
+        assertEquals(listOf("Strand", "Hund"), Suggest.anlassFromLabels(listOf("beach", "sky", "dog", "cat")))
+        val top = Suggest.topLabels(listOf(listOf(Label("Sky", 0.9f), Label("Beach", 0.7f)), listOf(Label("Beach", 0.8f))))
+        assertEquals(listOf("beach", "sky"), top)
+    }
 }

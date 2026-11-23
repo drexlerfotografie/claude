@@ -16,6 +16,19 @@ class SettingsStore(context: Context) {
         get() = prefs.getString("target", null) ?: "$storageRoot/Pictures/Sortiert"
         set(v) = prefs.edit().putString("target", v).apply()
 
+    var categories: List<String>
+        get() = prefs.getString("categories", null)?.split('\n')?.filter { it.isNotBlank() }
+            ?: app.fotosortierer.core.Suggest.DEFAULT_CATEGORIES
+        set(v) = prefs.edit().putString("categories", v.joinToString("\n")).apply()
+
+    var gapHours: Int
+        get() = prefs.getInt("gapHours", 3)
+        set(v) = prefs.edit().putInt("gapHours", v).apply()
+
+    var usePlaces: Boolean
+        get() = prefs.getBoolean("usePlaces", true)
+        set(v) = prefs.edit().putBoolean("usePlaces", v).apply()
+
     var recursive: Boolean
         get() = prefs.getBoolean("recursive", true)
         set(v) = prefs.edit().putBoolean("recursive", v).apply()

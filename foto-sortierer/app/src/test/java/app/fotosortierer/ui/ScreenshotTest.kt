@@ -61,6 +61,18 @@ class ScreenshotTest {
                 .crossfade(false)
                 .components { add(coil.decode.VideoFrameDecoder.Factory()) }.build()
         )
+        app.fotosortierer.data.AnalysisBackend.geocoder = { _, _, _ -> "Malcesine" }
+        app.fotosortierer.data.AnalysisBackend.labeler = { _, bmp ->
+            // Simulierte Bilderkennung nach Grundfarbe des Testbilds
+            val p = bmp.getPixel(bmp.width / 4, bmp.height / 4)
+            val r = Color.red(p); val g = Color.green(p); val b = Color.blue(p)
+            when {
+                b > r && b > g -> listOf(app.fotosortierer.core.Label("Lake", 0.9f), app.fotosortierer.core.Label("Sky", 0.8f), app.fotosortierer.core.Label("Beach", 0.6f))
+                g > r && g > b -> listOf(app.fotosortierer.core.Label("Plant", 0.9f), app.fotosortierer.core.Label("Mountain", 0.7f))
+                r > 200 && g < 160 -> listOf(app.fotosortierer.core.Label("Party", 0.8f), app.fotosortierer.core.Label("Smile", 0.7f), app.fotosortierer.core.Label("Cake", 0.6f))
+                else -> listOf(app.fotosortierer.core.Label("Sunset", 0.8f), app.fotosortierer.core.Label("Sky", 0.6f))
+            }
+        }
         val cam = File(root, "DCIM/Camera").apply { mkdirs() }
         val wa = File(root, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images").apply { mkdirs() }
         File(root, "Pictures/Screenshots").mkdirs()
@@ -90,6 +102,9 @@ class ScreenshotTest {
         File(cam, "IMG_20260815_101532_kopie.jpg").delete()
         File(cam, "IMG_20260815_101532.jpg").copyTo(File(wa, "IMG-20260815-WA0007.jpg"))
         val (c, d) = palettes[3]; photo(cam, "bearbeitet.jpg", c, d)
+        cam.listFiles()!!.filter { it.name.startsWith("IMG_202608") }.forEach {
+            androidx.exifinterface.media.ExifInterface(it).apply { setLatLong(45.756, 10.808); saveAttributes() }
+        }
 
         ApplicationProvider.getApplicationContext<Context>()
             .getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -145,52 +160,19 @@ class ScreenshotTest {
         rule.onNodeWithText("Sortieren").performClick()
         rule.onNodeWithText("Jetzt einlesen").performClick()
         rule.waitUntilAtLeastOneExists(hasText("Vorschau für", substring = true), 10_000)
-        // Tage (neueste zuerst): 23.11. (ohne Datum), 02.11. (WhatsApp), 24.10., 16.08., 15.08.
-        rule.onAllNodes(hasSetTextAction())[2].performTextInput("Konzert")
-        rule.onNode(dayList).performScrollToIndex(3)
-        settle()
-        rule.onAllNodesWithText("Sonntag, 16.08.2026").onFirst().assertExists()
-        val f = rule.onAllNodes(hasSetTextAction())
-        val n = f.fetchSemanticsNodes().size
-        f[n - 2].performTextInput("Gardasee")
-        f[n - 1].performTextInput("Gardasee")
-        rule.onNode(dayList).performScrollToIndex(0)
-        shot("2_sortieren")
+        rule.waitUntil(15_000) { rule.onAllNodesWithText("Vorschläge werden berechnet", substring = true).fetchSemanticsNodes().isEmpty() }
+        rule.onNode(dayList).performScrollToIndex(2)
+        shot("2_sortieren_vorschlaege")
 
+        rule.onNode(dayList).performScrollToIndex(0)
+        settle()
         rule.onAllNodesWithText("Alle wählen")[1].performClick()
-        shot("3_auswahl")
-        rule.onNodeWithText("Anlass …").performClick()
-        shot("4_anlass_dialog", idle = false)
-        rule.mainClock.autoAdvance = false
-        rule.runOnUiThread {
-            val wmg = Class.forName("android.view.WindowManagerGlobal")
-            val inst = wmg.getMethod("getInstance").invoke(null)
-            (wmg.getDeclaredField("mViews").apply { isAccessible = true }.get(inst) as List<*>)
-                .filterIsInstance<android.view.View>().filter { it !== rule.activity.window.decorView }
-                .forEach { v -> v.rootView.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK)); v.rootView.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK)) }
-        }
-        rule.mainClock.autoAdvance = true
-        rule.runOnUiThread {
-            androidx.lifecycle.ViewModelProvider(rule.activity)[AppViewModel::class.java].setAnlassForSelection("Geburtstag Anna")
-        }
+        rule.onNodeWithText("Kategorie").performClick()
+        shot("3_kategorie_auswahl")
+        rule.onAllNodesWithText("Familie & Freunde").let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
 
         rule.onNodeWithText("Vorschau für", substring = true).performClick()
         rule.waitUntilAtLeastOneExists(hasText("Ordner unter", substring = true), 10_000)
-        shot("5_vorschau")
-        rule.onNodeWithText("Verschieben").performClick()
-        shot("6_bestaetigung")
-        rule.onAllNodesWithText("Verschieben")[1].performClick()
-        rule.waitUntilAtLeastOneExists(hasText("Alles sortiert."), 10_000)
-
-        rule.onNodeWithText("Suchen").performClick()
-        shot("7_suchen")
-
-        rule.onNodeWithText("Duplikate").performClick()
-        rule.onNodeWithText("Duplikate suchen").performClick()
-        rule.waitUntilAtLeastOneExists(hasText("Gruppe", substring = true), 10_000)
-        shot("8_duplikate")
-
-        rule.onNodeWithText("Verlauf").performClick()
-        shot("9_verlauf")
+        shot("4_vorschau")
     }
 }

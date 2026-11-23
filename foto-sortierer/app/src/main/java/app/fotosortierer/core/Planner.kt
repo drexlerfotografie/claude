@@ -2,7 +2,7 @@ package app.fotosortierer.core
 
 import java.time.LocalDate
 
-data class Assignment(val item: MediaItem, val anlass: String)
+data class Assignment(val item: MediaItem, val anlass: String, val category: String = "")
 
 data class PlannedMove(val item: MediaItem, val target: String) {
     val targetName: String get() = target.substringAfterLast('/')
@@ -23,14 +23,15 @@ class Planner(targetRoot: String, private val listNames: (dir: String) -> List<S
         }
 
         val groups = assignments
-            .groupBy { it.item.taken.toLocalDate() to Naming.sanitizeAnlass(it.anlass) }
-            .toSortedMap(compareBy<Pair<LocalDate, String>>({ it.first }, { it.second }))
+            .groupBy {
+                val date = it.item.taken.toLocalDate()
+                Triple(date, Naming.dir(root, date, it.category), Naming.prefix(date, it.anlass))
+            }
+            .toSortedMap(compareBy<Triple<LocalDate, String, String>>({ it.first }, { it.second }, { it.third }))
 
         val result = ArrayList<PlannedMove>()
         for ((key, list) in groups) {
-            val (date, anlass) = key
-            val dir = "$root/${date.year}"
-            val prefix = Naming.prefix(date, anlass)
+            val (_, dir, prefix) = key
             val names = taken(dir)
 
             // Was schon korrekt benannt im richtigen Ordner liegt, bleibt unangetastet.

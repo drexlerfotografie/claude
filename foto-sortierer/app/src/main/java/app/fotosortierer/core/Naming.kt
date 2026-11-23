@@ -14,6 +14,7 @@ object Naming {
 
     fun sanitizeAnlass(raw: String): String =
         raw.trim()
+            .replace("&", " und ")
             .replace(illegal, "")
             .replace(spaces, "_")
             .replace(underscores, "_")
@@ -24,6 +25,13 @@ object Naming {
         val base = String.format(Locale.ROOT, "%04d_%02d_%02d", date.year, date.monthValue, date.dayOfMonth)
         val clean = sanitizeAnlass(anlass)
         return if (clean.isEmpty()) "${base}_" else "${base}_${clean}_"
+    }
+
+    /** Zielordner: <root>/<JJJJ>/<JJJJ>_<MM>[_<Kategorie>] */
+    fun dir(root: String, date: LocalDate, category: String): String {
+        val month = String.format(Locale.ROOT, "%04d_%02d", date.year, date.monthValue)
+        val clean = sanitizeAnlass(category)
+        return "${root.trimEnd('/')}/${date.year}/" + if (clean.isEmpty()) month else "${month}_$clean"
     }
 
     fun normalizedExt(ext: String): String = when (val e = ext.lowercase()) {
