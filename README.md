@@ -44,3 +44,8 @@ plugins/
 
 Weitere Plugins koennen unter `plugins/<plugin-name>/` angelegt und anschliessend in
 `.claude-plugin/marketplace.json` registriert werden.
+
+## Weitere Projekte
+
+- [`foto-sortierer/`](foto-sortierer/) – Android-App zum Sortieren von Fotos nach Aufnahmedatum und Anlass.
+  Die APK wird per GitHub Actions gebaut und unter *Releases* veröffentlicht.

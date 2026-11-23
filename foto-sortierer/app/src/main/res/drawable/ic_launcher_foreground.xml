@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- hinteres Foto -->
+    <path
+        android:fillColor="#9CC9D6"
+        android:pathData="M38,32h36a3,3 0,0 1,3 3v26a3,3 0,0 1,-3 3h-36a3,3 0,0 1,-3 -3v-26a3,3 0,0 1,3 -3z" />
+    <!-- vorderes Foto -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,40h38a3,3 0,0 1,3 3v28a3,3 0,0 1,-3 3h-38a3,3 0,0 1,-3 -3v-28a3,3 0,0 1,3 -3z" />
+    <!-- Berg -->
+    <path
+        android:fillColor="#1F4E5F"
+        android:pathData="M33,70l12,-15l8,9l6,-6l10,12z" />
+    <!-- Sonne -->
+    <path
+        android:fillColor="#F2A541"
+        android:pathData="M62,50m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
+    <!-- Sortier-Pfeil -->
+    <path
+        android:fillColor="#F2A541"
+        android:pathData="M76,52h6v16h5l-8,9l-8,-9h5z" />
+</vector>
