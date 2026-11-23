@@ -42,7 +42,7 @@ fun PreviewScreen(vm: AppViewModel, modifier: Modifier) {
 
     Column(modifier) {
         Text(
-            "${plan.size} Dateien → ${byDir.size} Ordner unter ${shortPath(vm.targetRoot, vm.storageRoot)}",
+            "${plural(plan.size, "Datei", "Dateien")} → ${plural(byDir.size, "Ordner", "Ordner")} unter ${shortPath(vm.targetRoot, vm.storageRoot)}",
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
@@ -52,8 +52,8 @@ fun PreviewScreen(vm: AppViewModel, modifier: Modifier) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             ) {
                 Text(
-                    "$uncertain Dateien haben kein Aufnahmedatum. Für sie wird das Änderungsdatum der Datei " +
-                        "verwendet, das kann falsch sein (z. B. Download- oder Kopierdatum). Du kannst sie unter " +
+                    (if (uncertain == 1) "1 Datei hat kein Aufnahmedatum. Dafür" else "$uncertain Dateien haben kein Aufnahmedatum. Für sie") +
+                        " wird das Änderungsdatum der Datei verwendet, das kann falsch sein (z. B. Download- oder Kopierdatum). Du kannst sie unter " +
                         "„Nur unsichere“ prüfen und bei Bedarf auslassen.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(10.dp),

@@ -156,7 +156,7 @@ private fun DayCard(
                 Column(Modifier.weight(1f)) {
                     Text(day.format(DAY_FORMAT), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "${items.size - videos} Fotos" + if (videos > 0) ", $videos Videos" else "",
+                        plural(items.size - videos, "Foto", "Fotos") + if (videos > 0) ", " + plural(videos, "Video", "Videos") else "",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.fotosortierer.core.MediaItem
 import app.fotosortierer.data.DUPLICATE_DIR
@@ -94,6 +95,7 @@ fun DuplicatesScreen(vm: AppViewModel, modifier: Modifier) {
                                 (if (it.path in marked) "✗ " else "✓ ") + shortPath(it.path, vm.storageRoot),
                                 style = MaterialTheme.typography.bodySmall,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }

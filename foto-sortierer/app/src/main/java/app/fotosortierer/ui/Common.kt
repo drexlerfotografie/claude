@@ -49,6 +49,8 @@ val DAY_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, dd.MM.yyy
 val DATETIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss", Locale.GERMAN)
 val MONTH_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)
 
+fun plural(n: Int, one: String, many: String) = "$n ${if (n == 1) one else many}"
+
 fun formatSize(bytes: Long): String = when {
     bytes >= 1L shl 30 -> String.format(Locale.GERMAN, "%.1f GB", bytes / (1L shl 30).toDouble())
     bytes >= 1L shl 20 -> String.format(Locale.GERMAN, "%.1f MB", bytes / (1L shl 20).toDouble())
