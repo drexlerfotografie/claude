@@ -58,7 +58,15 @@ class EndToEndTest {
     @Test
     fun fullFlow() {
         rule.onNodeWithText("Jetzt einlesen").performClick()
+        // Anfangs ist nichts ausgewählt
+        waitFor("Ereignisse oder Fotos auswählen")
+        rule.onNodeWithText("0 von 4 ausgewählt").assertExists()
+        rule.onNodeWithText("Alle anwählen").performClick()
         waitFor("Vorschau für 4 Dateien")
+        rule.onNodeWithText("Alle abwählen").performClick()
+        waitFor("Ereignisse oder Fotos auswählen")
+        rule.onNodeWithText("Alle anwählen").performClick()
+        waitFor("4 von 4 ausgewählt")
         rule.onNodeWithText("mit unsicherem Datum", substring = true).assertExists()
 
         // Jahresfilter 2023 → Karten: 06.11. (neueste zuerst), 05.11.

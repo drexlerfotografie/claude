@@ -85,8 +85,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val eventCategory = mutableStateMapOf<String, String>()
     val itemAnlass = mutableStateMapOf<String, String>()
     val itemCategory = mutableStateMapOf<String, String>()
-    var excluded by mutableStateOf(emptySet<String>()); private set
-    var excludedEvents by mutableStateOf(emptySet<String>()); private set
+    /** Zum Sortieren ausgewählte Dateien. Startet leer – du wählst selbst aus. */
+    var included by mutableStateOf(emptySet<String>()); private set
     var selection by mutableStateOf(emptySet<String>()); private set
     var plan by mutableStateOf<List<PlannedMove>?>(null); private set
 
@@ -130,7 +130,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         plan = null
         selection = emptySet()
         val known = library.mapTo(HashSet()) { it.path }
-        excluded = excluded.filterTo(HashSet()) { it in known }
+        included = included.filterTo(HashSet()) { it in known }
         itemAnlass.keys.retainAll(known)
         itemCategory.keys.retainAll(known)
         startAnalysis()
@@ -252,8 +252,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         eventCategory[e.id] = cat
     }
 
+    /** true = alle Dateien des Ereignisses, false = keine, null = teilweise. */
+    fun eventIncluded(e: Event): Boolean? {
+        val n = e.items.count { it.path in included }
+        return when (n) {
+            0 -> false
+            e.items.size -> true
+            else -> null
+        }
+    }
+
     fun setEventIncluded(e: Event, include: Boolean) {
-        excludedEvents = if (include) excludedEvents - e.id else excludedEvents + e.id
+        val paths = e.items.map { it.path }
+        included = if (include) included + paths else included - paths.toSet()
+    }
+
+    fun includeAll(events: List<Event>) {
+        included = included + events.flatMap { e -> e.items.map { it.path } }
+    }
+
+    fun excludeAll(events: List<Event>) {
+        included = included - events.flatMap { e -> e.items.map { it.path } }.toSet()
     }
 
     fun toggleSelect(path: String) {
@@ -279,16 +298,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         selection = emptySet()
     }
 
-    fun toggleExcludeSelection() {
-        excluded = if (selection.all { it in excluded }) excluded - selection else excluded + selection
+    fun toggleIncludeSelection() {
+        included = if (selection.all { it in included }) included - selection else included + selection
         selection = emptySet()
     }
 
     fun buildPlan() {
         viewModelScope.launch {
-            val assignments = events.filter { it.id !in excludedEvents }
-                .flatMap { it.items }
-                .filter { it.path !in excluded }
+            val assignments = events.flatMap { it.items }
+                .filter { it.path in included }
                 .map { Assignment(it, anlassFor(it), categoryFor(it)) }
             val result = withContext(Dispatchers.IO) {
                 Planner(targetRoot) { dir -> File(dir).list()?.toList() ?: emptyList() }.plan(assignments)

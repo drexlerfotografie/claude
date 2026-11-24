@@ -159,14 +159,19 @@ class ScreenshotTest {
 
         rule.onNodeWithText("Sortieren").performClick()
         rule.onNodeWithText("Jetzt einlesen").performClick()
-        rule.waitUntilAtLeastOneExists(hasText("Vorschau für", substring = true), 10_000)
+        rule.waitUntilAtLeastOneExists(hasText("ausgewählt", substring = true), 10_000)
         rule.waitUntil(15_000) { rule.onAllNodesWithText("Vorschläge werden berechnet", substring = true).fetchSemanticsNodes().isEmpty() }
+        shot("2_sortieren_start")
+        // erstes und zweites Ereignis einzeln anhaken
+        rule.onAllNodes(androidx.compose.ui.test.isToggleable())[0].performClick()
+        rule.onAllNodes(androidx.compose.ui.test.isToggleable())[1].performClick()
         rule.onNode(dayList).performScrollToIndex(2)
-        shot("2_sortieren_vorschlaege")
+        shot("2b_sortieren_vorschlaege")
+        rule.onNodeWithText("Alle anwählen").performClick()
 
         rule.onNode(dayList).performScrollToIndex(0)
         settle()
-        rule.onAllNodesWithText("Alle wählen")[1].performClick()
+        rule.onAllNodesWithText("Alle markieren")[1].performClick()
         rule.onNodeWithText("Kategorie").performClick()
         shot("3_kategorie_auswahl")
         rule.onAllNodesWithText("Familie & Freunde").let { it[it.fetchSemanticsNodes().size - 1] }.performClick()

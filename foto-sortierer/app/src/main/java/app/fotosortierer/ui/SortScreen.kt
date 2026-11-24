@@ -27,7 +27,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.fotosortierer.core.Event
@@ -106,7 +107,7 @@ fun SortScreen(vm: AppViewModel, modifier: Modifier, openFolders: () -> Unit) {
             .sortedByDescending { it.start }
             .toList()
     }
-    val activeCount = allEvents.filter { it.id !in vm.excludedEvents }.sumOf { e -> e.items.count { it.path !in vm.excluded } }
+    val activeCount = toSort.count { it.path in vm.included }
 
     Column(modifier) {
         if (vm.stale) StaleBanner(vm::scan)
@@ -142,6 +143,21 @@ fun SortScreen(vm: AppViewModel, modifier: Modifier, openFolders: () -> Unit) {
             return@Column
         }
 
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "$activeCount von ${toSort.size} ausgewählt",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f).padding(start = 4.dp),
+            )
+            TextButton(onClick = { vm.includeAll(events) }) { Text(if (year == null && !onlyUncertain) "Alle anwählen" else "Sichtbare anwählen") }
+            TextButton(onClick = { vm.excludeAll(events) }, enabled = activeCount > 0) {
+                Text(if (year == null && !onlyUncertain) "Alle abwählen" else "Sichtbare abwählen")
+            }
+        }
+
         LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(12.dp),
@@ -160,7 +176,12 @@ fun SortScreen(vm: AppViewModel, modifier: Modifier, openFolders: () -> Unit) {
                     onClick = vm::buildPlan,
                     enabled = activeCount > 0,
                     modifier = Modifier.fillMaxWidth().padding(12.dp),
-                ) { Text("Vorschau für ${plural(activeCount, "Datei", "Dateien")}") }
+                ) {
+                    Text(
+                        if (activeCount == 0) "Ereignisse oder Fotos auswählen"
+                        else "Vorschau für ${plural(activeCount, "Datei", "Dateien")}"
+                    )
+                }
             }
         }
     }
@@ -195,7 +216,7 @@ fun SortScreen(vm: AppViewModel, modifier: Modifier, openFolders: () -> Unit) {
 
 @Composable
 private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (MediaItem) -> Unit) {
-    val included = event.id !in vm.excludedEvents
+    val state = vm.eventIncluded(event)
     val anlass = vm.anlassFor(event)
     val category = vm.categoryFor(event)
     val videos = event.items.count { it.isVideo }
@@ -205,7 +226,14 @@ private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(included, { vm.setEventIncluded(event, it) })
+                TriStateCheckbox(
+                    state = when (state) {
+                        true -> ToggleableState.On
+                        false -> ToggleableState.Off
+                        null -> ToggleableState.Indeterminate
+                    },
+                    onClick = { vm.setEventIncluded(event, state != true) },
+                )
                 Column(Modifier.weight(1f)) {
                     Text(eventTitle(event), style = MaterialTheme.typography.titleSmall)
                     Text(
@@ -216,13 +244,13 @@ private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                TextButton(onClick = { vm.selectAll(event.items.map { it.path }) }) { Text("Alle wählen") }
+                TextButton(onClick = { vm.selectAll(event.items.map { it.path }) }) { Text("Alle markieren") }
             }
 
             // Kategorie
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
-                    OutlinedButton(onClick = { pickCategory = true }, enabled = included, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { pickCategory = true }, modifier = Modifier.fillMaxWidth()) {
                         if (vm.isSuggestedCategory(event)) Icon(Icons.Default.AutoAwesome, "Vorschlag", Modifier.padding(end = 6.dp))
                         Text(category.ifEmpty { "Keine Kategorie" }, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Icon(Icons.Default.ArrowDropDown, null)
@@ -235,7 +263,7 @@ private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (
                         DropdownMenuItem(text = { Text("Keine Kategorie") }, onClick = { vm.setEventCategory(event, ""); pickCategory = false })
                     }
                 }
-                if (above != null && included) {
+                if (above != null) {
                     val aboveAnlass = vm.anlassFor(above)
                     val aboveCat = vm.categoryFor(above)
                     if ((aboveAnlass.isNotEmpty() || aboveCat.isNotEmpty()) && (aboveAnlass != anlass || aboveCat != category)) {
@@ -259,11 +287,10 @@ private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (
                     IconButton(onClick = { vm.setEventAnlass(event, "") }) { Icon(Icons.Default.Close, "Leeren") }
                 }) else null,
                 singleLine = true,
-                enabled = included,
                 modifier = Modifier.fillMaxWidth(),
             )
             val ideas = vm.anlassIdeas(event)
-            if (included && ideas.isNotEmpty()) {
+            if (ideas.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(ideas) { idea -> AssistChip(onClick = { vm.setEventAnlass(event, idea) }, label = { Text(idea) }) }
                 }
@@ -297,7 +324,7 @@ private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (
                         item,
                         size = 76.dp,
                         selected = item.path in vm.selection,
-                        dimmed = !included || item.path in vm.excluded,
+                        dimmed = item.path !in vm.included,
                         badge = badge,
                         onClick = { vm.toggleSelect(item.path) },
                         onLongClick = { onDetail(item) },
@@ -310,7 +337,7 @@ private fun EventCard(vm: AppViewModel, event: Event, above: Event?, onDetail: (
 
 @Composable
 private fun SelectionBar(vm: AppViewModel, onAnlass: () -> Unit, onCategory: () -> Unit) {
-    val allExcluded = vm.selection.all { it in vm.excluded }
+    val allIncluded = vm.selection.all { it in vm.included }
     Surface(tonalElevation = 3.dp) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
@@ -320,7 +347,7 @@ private fun SelectionBar(vm: AppViewModel, onAnlass: () -> Unit, onCategory: () 
             IconButton(onClick = vm::clearSelection) { Icon(Icons.Default.Close, "Auswahl aufheben") }
             Text("${vm.selection.size}", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = vm::toggleExcludeSelection) { Text(if (allExcluded) "Einbeziehen" else "Auslassen") }
+            TextButton(onClick = vm::toggleIncludeSelection) { Text(if (allIncluded) "Auslassen" else "Einbeziehen") }
             OutlinedButton(onClick = onCategory) { Text("Kategorie") }
             Button(onClick = onAnlass) { Text("Anlass") }
         }
