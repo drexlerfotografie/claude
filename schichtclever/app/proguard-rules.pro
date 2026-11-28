@@ -1,0 +1,3 @@
+-keepattributes *Annotation*, InnerClasses
+-keepclassmembers class de.mediclever.schichtclever.data.** { *** Companion; *; }
+-keep,includedescriptorclasses class de.mediclever.schichtclever.data.**$$serializer { *; }
