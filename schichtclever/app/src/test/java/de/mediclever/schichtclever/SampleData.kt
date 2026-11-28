@@ -16,8 +16,18 @@ import de.mediclever.schichtclever.data.Urgency
 object SampleData {
     private const val H = 3_600_000L
     private const val D = 24 * H
+    val FRUEH = ShiftType.DEFAULTS.first { it.code == "F" }
+    val NACHT = ShiftType.DEFAULTS.first { it.code == "N" }
+    /** Eigene Vorlagen wie aus einem echten Dienstplan. */
+    val CUSTOM = listOf(
+        ShiftType("t", "T", "Tag RTW", 7 * 60, 12 * 60, false),
+        ShiftType("n", "N", "Nacht RTW", 19 * 60, 12 * 60, true),
+        ShiftType("f2", "F2", "Früh NEF", 6 * 60 + 30, 8 * 60 + 30, false),
+        ShiftType("bd", "BD", "Bereitschaft", 17 * 60, 15 * 60, true),
+        ShiftType("ka", "KA", "Kurs / Ausbildung", 8 * 60, 8 * 60, false),
+    )
 
-    fun build(now: Long = System.currentTimeMillis(), active: Boolean = true, activeType: ShiftType = ShiftType.NACHT): AppData {
+    fun build(now: Long = System.currentTimeMillis(), active: Boolean = true, activeType: ShiftType = NACHT): AppData {
         val shifts = mutableListOf<Shift>()
         val einsaetze = mutableListOf<Einsatz>()
         val cats = Category.entries
@@ -27,9 +37,9 @@ object SampleData {
         )
         // 14 vergangene Schichten, abwechselnd Tag und Nacht
         for (i in 1..14) {
-            val type = if (i % 3 == 0) ShiftType.FRUEH else ShiftType.NACHT
+            val type = if (i % 3 == 0) FRUEH else NACHT
             val start = now - i * 2 * D - 5 * H
-            val s = Shift(id = "s$i", type = type, startAt = start, plannedEndAt = start + type.hours * H, endAt = start + type.hours * H, unit = "RTW 1/83-1", rating = (i % 5) + 1)
+            val s = Shift(id = "s$i", type = type, startAt = start, plannedEndAt = start + type.durationMinutes * 60_000L, endAt = start + type.durationMinutes * 60_000L, unit = "RTW 1/83-1", rating = (i % 5) + 1)
             shifts += s
             repeat(3 + i % 4) { k ->
                 einsaetze += Einsatz(
@@ -41,7 +51,7 @@ object SampleData {
         }
         if (active) {
             val start = now - (4 * H + 47 * 60_000)
-            val s = Shift(id = "aktiv", type = activeType, startAt = start, plannedEndAt = start + activeType.hours * H, unit = if (activeType.night) "RTW 1/83-1" else "Intensiv 2")
+            val s = Shift(id = "aktiv", type = activeType, startAt = start, plannedEndAt = start + activeType.durationMinutes * 60_000L, unit = if (activeType.night) "RTW 1/83-1" else "Intensiv 2")
             shifts += s
             einsaetze += Einsatz(shiftId = s.id, alarmAt = start + 1 * H + 23 * 60_000, category = Category.TRAUMA, outcome = Outcome.TRANSPORT, measures = listOf(MeasureEntry("hws"), MeasureEntry("vakuum")))
             einsaetze += Einsatz(shiftId = s.id, alarmAt = start + 2 * H + 58 * 60_000, category = Category.NEURO, outcome = Outcome.TRANSPORT, measures = listOf(MeasureEntry("iv"), MeasureEntry("neuro"), MeasureEntry("bz")))

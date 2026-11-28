@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.mediclever.schichtclever.data.Repository
+import de.mediclever.schichtclever.ui.screens.longName
 import de.mediclever.schichtclever.ui.components.Cleverle
 import de.mediclever.schichtclever.ui.components.McCard
 import de.mediclever.schichtclever.ui.durationHm
@@ -52,11 +53,11 @@ class BlockActivity : ComponentActivity() {
                     Cleverle(Modifier.size(64.dp, 75.dp), dark = true)
                     Spacer(Modifier.height(24.dp))
                     Text(
-                        (if (shift != null) "Fokus · ${shift.type.label}schicht" else "Fokus-Modus").uppercase(),
+                        (if (shift != null) "Fokus · ${shift.type.code}" else "Fokus-Modus").uppercase(),
                         style = MaterialTheme.typography.labelSmall, color = LocalExtra.current.accent,
                     )
                     Text(
-                        "$label ist während deiner ${shift?.type?.label?.let { "${it}schicht" } ?: "Fokuszeit"} pausiert.",
+                        "$label ist während deiner ${shift?.type?.longName ?: "Fokuszeit"} pausiert.",
                         style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),
                     )
                     Text(
@@ -76,7 +77,7 @@ class BlockActivity : ComponentActivity() {
                     }
                     OutlinedButton(
                         onClick = {
-                            GuardService.allowedUntil[pkg] = System.currentTimeMillis() + 5 * 60_000
+                            FocusService.allowedUntil[pkg] = System.currentTimeMillis() + 5 * 60_000
                             packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it) }
                             finish()
                         },

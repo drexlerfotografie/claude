@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit
 private val zone: ZoneId get() = ZoneId.systemDefault()
 
 fun Long.hourOfDay(): Int = Instant.ofEpochMilli(this).atZone(zone).hour
+fun Long.minuteOfDay(): Int = Instant.ofEpochMilli(this).atZone(zone).let { it.hour * 60 + it.minute }
 fun Long.toLocalDate(): LocalDate = Instant.ofEpochMilli(this).atZone(zone).toLocalDate()
 fun daysSince(time: Long, now: Long = System.currentTimeMillis()): Long =
     ChronoUnit.DAYS.between(time.toLocalDate(), now.toLocalDate())
@@ -21,7 +22,7 @@ data class Stats(
     val hours: Double,
     val byHour: IntArray,
     val byCategory: List<Pair<Category, Int>>,
-    val avgPerShiftType: List<Pair<ShiftType, Double>>,
+    val avgPerShiftType: List<Pair<String, Double>>,
     val topMeasures: List<Pair<String, Int>>,
     val peakHour: Int?,
     val nightStreak: Int,
@@ -33,7 +34,7 @@ fun AppData.stats(period: Period, now: Long = System.currentTimeMillis()): Stats
     val ss = shifts.filter { it.startAt >= from }
     val byHour = IntArray(24).also { arr -> es.forEach { arr[it.alarmAt.hourOfDay()]++ } }
     val byCat = es.groupingBy { it.category }.eachCount().toList().sortedByDescending { it.second }
-    val avg = ss.groupBy { it.type }.map { (type, list) ->
+    val avg = ss.groupBy { it.type.code }.map { (type, list) ->
         val count = list.sumOf { s -> es.count { it.shiftId == s.id } }
         type to count.toDouble() / list.size
     }.sortedByDescending { it.second }

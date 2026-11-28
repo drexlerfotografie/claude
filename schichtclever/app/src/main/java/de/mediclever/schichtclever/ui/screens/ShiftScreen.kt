@@ -60,6 +60,7 @@ import de.mediclever.schichtclever.data.Role
 import de.mediclever.schichtclever.data.Shift
 import de.mediclever.schichtclever.data.ShiftType
 import de.mediclever.schichtclever.data.hourOfDay
+import de.mediclever.schichtclever.data.minuteOfDay
 import de.mediclever.schichtclever.focus.FocusController
 import de.mediclever.schichtclever.ui.components.McCard
 import de.mediclever.schichtclever.ui.components.SectionLabel
@@ -89,15 +90,15 @@ fun rememberNow(intervalMs: Long = 30_000): Long {
 }
 
 @Composable
-fun ShiftScreen(data: AppData, onNewEinsatz: () -> Unit, onOpenEinsatz: (String) -> Unit, onOpenFocus: () -> Unit, onOpenFilter: () -> Unit) {
+fun ShiftScreen(data: AppData, onNewEinsatz: () -> Unit, onOpenEinsatz: (String) -> Unit, onOpenFocus: () -> Unit, onOpenFilter: () -> Unit, onOpenTemplates: () -> Unit = {}) {
     val active = data.activeShift
-    var showStart by rememberSaveable { mutableStateOf<ShiftType?>(null) }
+    var showStart by rememberSaveable { mutableStateOf<String?>(null) }
     var showEnd by rememberSaveable { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 96.dp)) {
             Header()
-            if (active == null) IdleContent(data, onPick = { showStart = it })
+            if (active == null) IdleContent(data, onPick = { showStart = it.id }, onOpenTemplates = onOpenTemplates)
             else ActiveContent(data, active, onOpenEinsatz, onOpenFocus, onOpenFilter, onEnd = { showEnd = true })
         }
         if (active != null) {
@@ -113,7 +114,7 @@ fun ShiftScreen(data: AppData, onNewEinsatz: () -> Unit, onOpenEinsatz: (String)
         }
     }
 
-    showStart?.let { type -> StartShiftSheet(data, type, onDismiss = { showStart = null }) }
+    showStart?.let { id -> data.settings.shiftTemplates.firstOrNull { it.id == id }?.let { t -> StartShiftSheet(data, t, onDismiss = { showStart = null }) } }
     if (showEnd && active != null) EndShiftSheet(data, active, onDismiss = { showEnd = false })
 }
 
@@ -125,40 +126,59 @@ private fun Header() {
     }
 }
 
-private fun ShiftType.icon() = when (this) {
-    ShiftType.FRUEH -> Icons.Outlined.WbTwilight
-    ShiftType.SPAET, ShiftType.ZWOELF_TAG -> Icons.Outlined.LightMode
-    ShiftType.NACHT, ShiftType.ZWOELF_NACHT -> Icons.Outlined.Bedtime
-    ShiftType.VIERUNDZWANZIG -> Icons.Outlined.Schedule
+fun ShiftType.icon() = when {
+    durationMinutes >= 20 * 60 -> Icons.Outlined.Schedule
+    night -> Icons.Outlined.Bedtime
+    startMinute < 10 * 60 -> Icons.Outlined.WbTwilight
+    else -> Icons.Outlined.LightMode
 }
 
+/** "Nachtschicht", aber bei eigenen Namen wie "Bereitschaft" kein angehängtes "schicht". */
+val ShiftType.longName: String get() = if (label.endsWith("schicht", true) || label.contains(' ') || label.length > 8) label else "${label}schicht"
+
 @Composable
-private fun IdleContent(data: AppData, onPick: (ShiftType) -> Unit) {
+private fun IdleContent(data: AppData, onPick: (ShiftType) -> Unit, onOpenTemplates: () -> Unit) {
     val now = rememberNow()
-    val suggested = ShiftType.guess(now.hourOfDay())
+    val templates = data.settings.shiftTemplates
+    val suggested = ShiftType.guess(templates, now.minuteOfDay())
     Text(now.dateLong().uppercase(), style = MaterialTheme.typography.labelSmall, color = LocalExtra.current.muted, modifier = Modifier.padding(top = 12.dp))
     Text("${greeting(now.hourOfDay())}\nWelche Schicht steht an?", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 4.dp, bottom = 16.dp))
 
-    ShiftType.entries.chunked(3).forEach { row ->
+    (templates.map<ShiftType, ShiftType?> { it } + null).chunked(3).forEach { row ->
         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { t ->
-                McCard(Modifier.weight(1f), accent = t == suggested, onClick = { onPick(t) }, padding = 12.dp) {
-                    Icon(t.icon(), null, tint = if (t == suggested) LocalExtra.current.accent else LocalExtra.current.muted)
-                    Spacer(Modifier.height(10.dp))
-                    Text(t.label, style = MaterialTheme.typography.titleLarge)
-                    Text(t.rangeLabel, style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
+                if (t == null) {
+                    McCard(Modifier.weight(1f).height(118.dp), onClick = onOpenTemplates, padding = 12.dp) {
+                        Icon(Icons.Outlined.Add, null, tint = LocalExtra.current.muted)
+                        Spacer(Modifier.height(10.dp))
+                        Text("Eigene", style = MaterialTheme.typography.titleLarge)
+                        Text("Schichten verwalten", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
+                    }
+                } else {
+                    val sel = t.id == suggested?.id
+                    McCard(Modifier.weight(1f).height(118.dp), accent = sel, onClick = { onPick(t) }, padding = 12.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(t.icon(), null, tint = if (sel) LocalExtra.current.accent else LocalExtra.current.muted, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.weight(1f))
+                            Text(t.code, style = MaterialTheme.typography.titleLarge, color = if (sel) LocalExtra.current.accent else MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(t.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(t.rangeLabel, style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
+                    }
                 }
             }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
-    Button(
+    if (suggested != null) Button(
         onClick = { onPick(suggested) },
         modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 4.dp),
         shape = MaterialTheme.shapes.small,
     ) {
         Icon(Icons.Outlined.PlayArrow, null)
         Spacer(Modifier.width(8.dp))
-        Text("${suggested.label}schicht starten".uppercase(), style = MaterialTheme.typography.titleLarge)
+        Text("${suggested.longName} starten".uppercase(), style = MaterialTheme.typography.titleLarge, maxLines = 1)
     }
     Text(
         "Fokus-Modus und Blaufilter starten mit, je nach Einstellung.",
@@ -170,7 +190,7 @@ private fun IdleContent(data: AppData, onPick: (ShiftType) -> Unit) {
         SectionLabel("Letzte Schicht")
         McCard(Modifier.fillMaxWidth()) {
             val count = data.einsaetze.count { it.shiftId == last.id }
-            Text("${last.type.label} · ${last.startAt.date()}", style = MaterialTheme.typography.titleMedium)
+            Text("${last.type.code} · ${last.type.label} · ${last.startAt.date()}", style = MaterialTheme.typography.titleMedium)
             Text(
                 "${durationHm((last.endAt ?: last.startAt) - last.startAt)} h · $count ${data.settings.role.einsatzWord(true)}" +
                     (last.unit.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
@@ -196,7 +216,7 @@ private fun ActiveContent(
 
     McCard(Modifier.fillMaxWidth().padding(top = 12.dp), accent = true) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("● ${shift.type.label}schicht läuft".uppercase(), style = MaterialTheme.typography.labelSmall, color = LocalExtra.current.accent, modifier = Modifier.weight(1f))
+            Text("● ${shift.type.code} · ${shift.type.longName} läuft".uppercase(), style = MaterialTheme.typography.labelSmall, color = LocalExtra.current.accent, modifier = Modifier.weight(1f))
             if (shift.unit.isNotBlank()) Text(shift.unit, style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
         }
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
@@ -301,19 +321,31 @@ fun EinsatzRow(e: Einsatz, data: AppData, onClick: () -> Unit) {
 private fun StartShiftSheet(data: AppData, initial: ShiftType, onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var type by remember { mutableStateOf(initial) }
+    var fromPlan by remember { mutableStateOf(false) }
+    val now = System.currentTimeMillis()
+    val planStart = plannedStart(type, now)
     var unit by remember { mutableStateOf(data.shifts.lastOrNull()?.unit ?: "") }
     var focus by remember { mutableStateOf(data.settings.focusAutoWithShift) }
     val recentUnits = data.shifts.map { it.unit }.filter { it.isNotBlank() }.distinct().takeLast(3)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, shape = MaterialTheme.shapes.medium, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-            Text("${type.label}schicht starten", style = MaterialTheme.typography.headlineSmall)
-            SectionLabel("Schichttyp")
+            Text("${type.longName} starten", style = MaterialTheme.typography.headlineSmall)
+            SectionLabel("Schicht")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ShiftType.entries.forEach { t ->
-                    de.mediclever.schichtclever.ui.components.McChip(t.label, t == type, { type = t })
+                data.settings.shiftTemplates.forEach { t ->
+                    de.mediclever.schichtclever.ui.components.McChip("${t.code} · ${t.label}", t.id == type.id, { type = t })
                 }
             }
+            SectionLabel("Beginn")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                de.mediclever.schichtclever.ui.components.McChip("Jetzt (${now.time()})", !fromPlan, { fromPlan = false })
+                de.mediclever.schichtclever.ui.components.McChip("Laut Plan (${planStart.time()})", fromPlan, { fromPlan = true })
+            }
+            Text(
+                "Schichtende: ${((if (fromPlan) planStart else now) + type.durationMinutes * 60_000L).time()} Uhr",
+                style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted, modifier = Modifier.padding(top = 6.dp),
+            )
             SectionLabel("Fahrzeug / Station (optional)")
             OutlinedTextField(
                 value = unit, onValueChange = { unit = it.take(40) }, singleLine = true,
@@ -336,7 +368,7 @@ private fun StartShiftSheet(data: AppData, initial: ShiftType, onDismiss: () -> 
                 style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp),
             )
             Button(
-                onClick = { Repository.startShift(type, unit = unit.trim(), focus = focus); onDismiss() },
+                onClick = { Repository.startShift(type, startAt = if (fromPlan) planStart else System.currentTimeMillis(), unit = unit.trim(), focus = focus); onDismiss() },
                 modifier = Modifier.fillMaxWidth().height(52.dp), shape = MaterialTheme.shapes.small,
             ) { Text("Schicht starten".uppercase(), style = MaterialTheme.typography.titleLarge) }
         }
@@ -355,7 +387,7 @@ private fun EndShiftSheet(data: AppData, shift: Shift, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, shape = MaterialTheme.shapes.medium, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
             Text("Schicht beenden", style = MaterialTheme.typography.headlineSmall)
-            Text("${shift.type.label} · ${shift.startAt.date()} ${shift.unit}", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
+            Text("${shift.type.code} · ${shift.type.label} · ${shift.startAt.date()} ${shift.unit}", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatTile(durationHm(System.currentTimeMillis() - shift.startAt), "Stunden", Modifier.weight(1f))
                 StatTile(es.size.toString(), data.settings.role.einsatzWord(true), Modifier.weight(1f))
@@ -397,4 +429,12 @@ private fun EndShiftSheet(data: AppData, shift: Shift, onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Weiterarbeiten") }
         }
     }
+}
+
+/** Geplanter Beginn: heute zur Vorlagen-Uhrzeit, oder gestern, falls das mehr als 2 h in der Zukunft läge. */
+fun plannedStart(t: ShiftType, now: Long): Long {
+    val z = java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.systemDefault())
+    var start = z.toLocalDate().atStartOfDay(z.zone).plusMinutes(t.startMinute.toLong())
+    if (start.toInstant().toEpochMilli() > now + 2 * 3_600_000L) start = start.minusDays(1)
+    return start.toInstant().toEpochMilli()
 }

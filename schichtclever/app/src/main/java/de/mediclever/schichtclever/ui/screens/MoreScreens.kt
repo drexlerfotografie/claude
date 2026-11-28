@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.QueryStats
+import androidx.compose.material.icons.outlined.EditCalendar
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Contrast
@@ -58,7 +61,7 @@ import de.mediclever.schichtclever.ui.components.SettingRow
 import de.mediclever.schichtclever.ui.theme.LocalExtra
 
 @Composable
-fun MoreScreen(data: AppData, dark: Boolean, onOpenFocus: () -> Unit, onOpenFilter: () -> Unit) {
+fun MoreScreen(data: AppData, dark: Boolean, onOpenFocus: () -> Unit, onOpenFilter: () -> Unit, onOpenTemplates: () -> Unit = {}) {
     val context = LocalContext.current
     val s = data.settings
     var confirmDelete by remember { mutableStateOf(false) }
@@ -82,6 +85,9 @@ fun MoreScreen(data: AppData, dark: Boolean, onOpenFocus: () -> Unit, onOpenFilt
 
         SectionLabel("Schicht-Werkzeuge")
         McCard(Modifier.fillMaxWidth(), padding = 0.dp) {
+            SettingRow("Meine Schichten", data.settings.shiftTemplates.joinToString(" · ") { it.code }.ifEmpty { "keine angelegt" },
+                Icons.Outlined.EditCalendar, onClick = onOpenTemplates, trailing = { Icon(Icons.Outlined.ChevronRight, null, tint = LocalExtra.current.muted) })
+            HorizontalDivider(color = LocalExtra.current.line)
             SettingRow("Fokus-Modus", "${s.blockedApps.size} Apps · " + if (s.dndEnabled) "Bitte nicht stören" else "ohne Bitte nicht stören",
                 Icons.Outlined.Block, onClick = onOpenFocus, trailing = { Icon(Icons.Outlined.ChevronRight, null, tint = LocalExtra.current.muted) })
             HorizontalDivider(color = LocalExtra.current.line)
@@ -117,7 +123,7 @@ fun MoreScreen(data: AppData, dark: Boolean, onOpenFocus: () -> Unit, onOpenFilt
             Text("Medi", style = MaterialTheme.typography.bodySmall)
             Text("Clever", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.accent)
             Spacer(Modifier.weight(1f))
-            Text("Version 0.1.0", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
+            Text("Version ${de.mediclever.schichtclever.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
         }
     }
 
@@ -193,12 +199,23 @@ fun OnboardingScreen(data: AppData, dark: Boolean) {
                 }
                 else -> Column {
                     val dndOk = remember(tick) { FocusController.hasDndAccess(context) }
-                    val guardOk = remember(tick) { FocusController.isGuardEnabled(context) }
+                    val usageOk = remember(tick) { FocusController.hasUsageAccess(context) }
+                    val overlayOk = remember(tick) { FocusController.canOverlay(context) }
+                    val notifLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                    ) { }
                     Text("Damit Fokus wirklich wirkt", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 8.dp))
                     Text("Diese Freigaben sind optional, du kannst sie auch später erteilen.",
                         style = MaterialTheme.typography.bodyMedium, color = LocalExtra.current.muted, modifier = Modifier.padding(vertical = 12.dp))
                     PermissionCard("Bitte nicht stören", "Schaltet „Bitte nicht stören“ automatisch zu Schichtbeginn ein und zum Ende wieder aus.", dndOk, Icons.Outlined.DoNotDisturbOn) { context.openDndSettings() }
-                    PermissionCard("Bedienungshilfe", "Erkennt, wenn du eine pausierte App öffnest, und legt den Blaufilter über den Bildschirm. Es werden keine Inhalte gelesen.", guardOk, Icons.Outlined.Accessibility) { context.openAccessibilitySettings() }
+                    PermissionCard("Nutzungszugriff", "Erkennt, wenn du während des Fokus eine pausierte App öffnest. Es wird nur der App-Name gelesen, keine Inhalte.", usageOk, Icons.Outlined.QueryStats) { context.openUsageSettings() }
+                    PermissionCard("Über anderen Apps einblenden", "Für den Blaufilter und die Sperrseite.", overlayOk, Icons.Outlined.Layers) { context.openOverlaySettings() }
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        val notifOk = remember(tick) { context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED }
+                        PermissionCard("Benachrichtigung", "Zeigt während der Schicht an, dass Fokus oder Blaufilter laufen.", notifOk, Icons.Outlined.Notifications) {
+                            notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
                     SectionLabel("Kacheln hinzufügen")
                     TilesSection()
                     Text("SchichtClever hat keine Internet-Berechtigung. Deine Daten bleiben auf dem Gerät.",

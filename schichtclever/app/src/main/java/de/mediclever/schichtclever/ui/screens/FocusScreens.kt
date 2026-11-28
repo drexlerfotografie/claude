@@ -24,7 +24,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.DoNotDisturbOn
 import androidx.compose.material.icons.outlined.Info
@@ -63,7 +64,7 @@ import de.mediclever.schichtclever.data.AppData
 import de.mediclever.schichtclever.data.FilterSchedule
 import de.mediclever.schichtclever.data.Repository
 import de.mediclever.schichtclever.focus.FocusController
-import de.mediclever.schichtclever.focus.GuardService
+import de.mediclever.schichtclever.focus.FocusService
 import de.mediclever.schichtclever.tiles.EinsatzTileService
 import de.mediclever.schichtclever.tiles.FocusTileService
 import de.mediclever.schichtclever.tiles.ShiftTileService
@@ -84,7 +85,10 @@ fun rememberResumeTick(): Int {
 }
 
 fun Context.openDndSettings() = startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-fun Context.openAccessibilitySettings() = startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+fun Context.openUsageSettings() = startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+fun Context.openOverlaySettings() = startActivity(
+    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+)
 
 /** Android 13+: Kachel direkt per Systemdialog zu den Schnelleinstellungen hinzufügen lassen. */
 fun Context.requestAddTile(cls: Class<*>, label: String, icon: Int) {
@@ -115,7 +119,8 @@ fun FocusScreen(data: AppData, onBack: () -> Unit) {
     val context = LocalContext.current
     val tick = rememberResumeTick()
     val dndOk = remember(tick) { FocusController.hasDndAccess(context) }
-    val guardOk = remember(tick) { FocusController.isGuardEnabled(context) }
+    val usageOk = remember(tick) { FocusController.hasUsageAccess(context) }
+    val overlayOk = remember(tick) { FocusController.canOverlay(context) }
     var apps by remember { mutableStateOf<List<LaunchableApp>?>(null) }
     var query by remember { mutableStateOf("") }
     val s = data.settings
@@ -154,13 +159,18 @@ fun FocusScreen(data: AppData, onBack: () -> Unit) {
             SettingRow("Bitte nicht stören", "Anrufe von Favoriten und wiederholte Anrufe kommen je nach System-Einstellung durch", Icons.Outlined.DoNotDisturbOn,
                 s.dndEnabled, { v -> Repository.settings { it.copy(dndEnabled = v) } })
         }
-        if (!dndOk || !guardOk) SectionLabel("Fehlende Freigaben")
+        if (!dndOk || !usageOk || !overlayOk) SectionLabel("Fehlende Freigaben")
         if (!dndOk) PermissionCard("Bitte nicht stören", "Damit SchichtClever den Modus ein- und ausschalten darf.", false, Icons.Outlined.DoNotDisturbOn) { context.openDndSettings() }
-        if (!guardOk) PermissionCard(
-            "Bedienungshilfe",
-            "Unter „Installierte Apps“ → SchichtClever einschalten. Nötig, um pausierte Apps zu erkennen. Es werden keine Inhalte gelesen.",
-            false, Icons.Outlined.Accessibility,
-        ) { context.openAccessibilitySettings() }
+        if (!usageOk) PermissionCard(
+            "Nutzungszugriff",
+            "In der Liste SchichtClever wählen und erlauben. Damit erkennt die App, welche App gerade geöffnet ist. Inhalte werden nicht gelesen.",
+            false, Icons.Outlined.QueryStats,
+        ) { context.openUsageSettings() }
+        if (!overlayOk) PermissionCard(
+            "Über anderen Apps einblenden",
+            "Damit die Sperrseite erscheinen kann, wenn du eine pausierte App öffnest.",
+            false, Icons.Outlined.Layers,
+        ) { context.openOverlaySettings() }
 
         SectionLabel("Apps pausieren", trailing = "${s.blockedApps.size} pausiert")
         Text(
@@ -195,22 +205,22 @@ fun FocusScreen(data: AppData, onBack: () -> Unit) {
 fun FilterScreen(data: AppData, onBack: () -> Unit) {
     val context = LocalContext.current
     val tick = rememberResumeTick()
-    val guardOk = remember(tick) { FocusController.isGuardEnabled(context) }
+    val overlayOk = remember(tick) { FocusController.canOverlay(context) }
     val s = data.settings
     val active = FocusController.filterActive(data)
 
     SubScreen("Blaufilter & Nacht", onBack) {
         Row(Modifier.fillMaxWidth().height(110.dp)) {
             PreviewHalf("Ohne Filter", Color.Transparent, Modifier.weight(1f))
-            PreviewHalf("Mit Filter", Color(GuardService.filterColor(s.filterIntensity, s.filterDim)), Modifier.weight(1f))
+            PreviewHalf("Mit Filter", Color(FocusService.previewArgb(s.filterIntensity, s.filterDim)), Modifier.weight(1f))
         }
-        if (!guardOk) {
+        if (!overlayOk) {
             Spacer(Modifier.height(12.dp))
             PermissionCard(
-                "Bedienungshilfe einschalten",
-                "Der Blaufilter liegt als Schicht über dem Bildschirm. Dafür muss der SchichtClever-Dienst unter Bedienungshilfen aktiv sein.",
-                false, Icons.Outlined.Accessibility,
-            ) { context.openAccessibilitySettings() }
+                "Über anderen Apps einblenden",
+                "Der Blaufilter liegt als halbtransparente Schicht über dem Bildschirm. Dafür braucht SchichtClever diese Freigabe.",
+                false, Icons.Outlined.Layers,
+            ) { context.openOverlaySettings() }
         }
         Spacer(Modifier.height(12.dp))
         McCard(Modifier.fillMaxWidth(), accent = active, padding = 0.dp) {

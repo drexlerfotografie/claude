@@ -49,6 +49,7 @@ import de.mediclever.schichtclever.ui.screens.ShiftScreen
 import de.mediclever.schichtclever.ui.screens.SkillDetailScreen
 import de.mediclever.schichtclever.ui.screens.SkillsScreen
 import de.mediclever.schichtclever.ui.screens.StatsScreen
+import de.mediclever.schichtclever.ui.screens.TemplatesScreen
 import de.mediclever.schichtclever.ui.screens.einsatzWord
 import de.mediclever.schichtclever.ui.theme.LocalExtra
 import de.mediclever.schichtclever.ui.theme.SchichtCleverTheme
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingRoute.value = intent?.getStringExtra(EXTRA_ROUTE)
+        de.mediclever.schichtclever.focus.FocusController.sync(this, Repository.data.value)
         setContent {
             val data by Repository.data.collectAsStateWithLifecycle()
             val dark = data.useDark()
@@ -140,12 +142,14 @@ class MainActivity : ComponentActivity() {
                         onOpenEinsatz = { nav.navigate("einsatz/$it") },
                         onOpenFocus = { nav.navigate("fokus") },
                         onOpenFilter = { nav.navigate("filter") },
+                        onOpenTemplates = { nav.navigate("vorlagen") },
                     )
                 }
                 composable("einsaetze") { EinsaetzeScreen(data, dark, onOpen = { nav.navigate("einsatz/$it") }, onNew = { nav.navigate("einsatz/neu") }) }
                 composable("statistik") { StatsScreen(data) }
                 composable("skills") { SkillsScreen(data, dark, onOpen = { nav.navigate("skill/$it") }) }
-                composable("mehr") { MoreScreen(data, dark, onOpenFocus = { nav.navigate("fokus") }, onOpenFilter = { nav.navigate("filter") }) }
+                composable("mehr") { MoreScreen(data, dark, onOpenFocus = { nav.navigate("fokus") }, onOpenFilter = { nav.navigate("filter") }, onOpenTemplates = { nav.navigate("vorlagen") }) }
+                composable("vorlagen") { TemplatesScreen(data, onBack = { nav.popBackStack() }) }
                 composable("einsatz/{id}") { entry ->
                     val id = entry.arguments?.getString("id")?.takeIf { it != "neu" }
                     EinsatzEditorScreen(data, id, onClose = { nav.popBackStack() })

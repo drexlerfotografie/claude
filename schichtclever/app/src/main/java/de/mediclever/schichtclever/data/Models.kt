@@ -13,24 +13,40 @@ enum class Role(val label: String, val unitHint: String) {
     AUSBILDUNG("Ausbildung & Studium", "z. B. Praktikum Lehrrettungswache"),
 }
 
+/**
+ * Schichtvorlage. Standardvorlagen werden beim ersten Start angelegt, danach kann man sie
+ * frei ändern, löschen und eigene mit Kürzel anlegen (z. B. "N", "F2", "BD").
+ * Eine laufende Schicht speichert eine Kopie der Vorlage, damit spätere Änderungen alte Schichten nicht verfälschen.
+ */
 @Serializable
-enum class ShiftType(val label: String, val startHour: Int, val hours: Int, val night: Boolean) {
-    FRUEH("Früh", 6, 8, false),
-    SPAET("Spät", 14, 8, false),
-    NACHT("Nacht", 22, 8, true),
-    ZWOELF_TAG("12 h Tag", 7, 12, false),
-    ZWOELF_NACHT("12 h Nacht", 19, 12, true),
-    VIERUNDZWANZIG("24 h", 7, 24, true);
-
-    val rangeLabel: String
-        get() = "%02d–%02d Uhr".format(startHour, (startHour + hours) % 24)
+data class ShiftType(
+    val id: String = newId(),
+    val code: String,
+    val label: String,
+    /** Beginn in Minuten nach Mitternacht. */
+    val startMinute: Int,
+    val durationMinutes: Int,
+    val night: Boolean,
+) {
+    val hours: Double get() = durationMinutes / 60.0
+    val startLabel: String get() = "%02d:%02d".format(startMinute / 60, startMinute % 60)
+    val endLabel: String get() = ((startMinute + durationMinutes) % 1440).let { "%02d:%02d".format(it / 60, it % 60) }
+    val rangeLabel: String get() = "$startLabel–$endLabel"
 
     companion object {
-        /** Schätzt die passende Schicht für die aktuelle Uhrzeit (für Schnellstart per Kachel). */
-        fun guess(hour: Int): ShiftType = when (hour) {
-            in 5..11 -> FRUEH
-            in 12..18 -> SPAET
-            else -> NACHT
+        val DEFAULTS = listOf(
+            ShiftType("frueh", "F", "Früh", 6 * 60, 8 * 60, false),
+            ShiftType("spaet", "S", "Spät", 14 * 60, 8 * 60, false),
+            ShiftType("nacht", "N", "Nacht", 22 * 60, 8 * 60, true),
+            ShiftType("tag12", "T12", "12 h Tag", 7 * 60, 12 * 60, false),
+            ShiftType("nacht12", "N12", "12 h Nacht", 19 * 60, 12 * 60, true),
+            ShiftType("dienst24", "24", "24 h", 7 * 60, 24 * 60, true),
+        )
+
+        /** Vorlage, deren Beginn der aktuellen Uhrzeit am nächsten liegt (für Schnellstart per Kachel). */
+        fun guess(templates: List<ShiftType>, minuteOfDay: Int): ShiftType? = templates.minByOrNull {
+            val d = kotlin.math.abs(it.startMinute - minuteOfDay)
+            minOf(d, 1440 - d)
         }
     }
 }
@@ -132,6 +148,7 @@ data class Settings(
     val filterIntensity: Float = 0.4f,
     val filterDim: Float = 0.0f,
     val customSkills: List<Skill> = emptyList(),
+    val shiftTemplates: List<ShiftType> = ShiftType.DEFAULTS,
     /** Merkt sich, ob SchichtClever "Bitte nicht stören" eingeschaltet hat, damit wir nur das wieder ausschalten. */
     val dndSetByApp: Boolean = false,
 )

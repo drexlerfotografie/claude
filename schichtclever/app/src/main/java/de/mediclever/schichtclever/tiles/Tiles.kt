@@ -10,7 +10,7 @@ import android.widget.Toast
 import de.mediclever.schichtclever.MainActivity
 import de.mediclever.schichtclever.data.Repository
 import de.mediclever.schichtclever.data.ShiftType
-import de.mediclever.schichtclever.data.hourOfDay
+import de.mediclever.schichtclever.data.minuteOfDay
 import de.mediclever.schichtclever.ui.durationHm
 import de.mediclever.schichtclever.ui.time
 
@@ -43,17 +43,19 @@ class ShiftTileService : BaseTile() {
     override fun render(tile: Tile) {
         val shift = Repository.data.value.activeShift
         tile.state = if (shift != null) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = if (shift != null) "${shift.type.label} aktiv" else "Schicht starten"
+        tile.label = if (shift != null) "${shift.type.code} aktiv" else "Schicht starten"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            tile.subtitle = shift?.let { "seit ${durationHm(System.currentTimeMillis() - it.startAt)} h" } ?: ShiftType.guess(System.currentTimeMillis().hourOfDay()).label
+            tile.subtitle = shift?.let { "seit ${durationHm(System.currentTimeMillis() - it.startAt)} h" } ?: guess()?.let { "${it.code} · ${it.label}" } ?: "Keine Vorlage"
         }
     }
+
+    private fun guess() = ShiftType.guess(Repository.data.value.settings.shiftTemplates, System.currentTimeMillis().minuteOfDay())
 
     override fun onClick() {
         val shift = Repository.data.value.activeShift
         if (shift == null) {
-            Repository.startShift(ShiftType.guess(System.currentTimeMillis().hourOfDay()))
-            refresh()
+            val t = guess()
+            if (t == null) openApp("vorlagen") else { Repository.startShift(t); refresh() }
         } else {
             // Beenden mit Zusammenfassung passiert in der App.
             openApp("schicht")

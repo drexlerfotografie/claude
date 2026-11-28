@@ -79,12 +79,30 @@ object Repository {
         val shift = Shift(
             type = type,
             startAt = startAt,
-            plannedEndAt = startAt + type.hours * 3_600_000L,
+            plannedEndAt = startAt + type.durationMinutes * 60_000L,
             unit = unit,
             focus = focus ?: d.settings.focusAutoWithShift,
         )
         d.copy(shifts = d.shifts + shift)
     }
+
+    fun saveTemplate(t: ShiftType) = settings { s ->
+        val exists = s.shiftTemplates.any { it.id == t.id }
+        s.copy(shiftTemplates = if (exists) s.shiftTemplates.map { if (it.id == t.id) t else it } else s.shiftTemplates + t)
+    }
+
+    fun deleteTemplate(id: String) = settings { s -> s.copy(shiftTemplates = s.shiftTemplates.filterNot { it.id == id }) }
+
+    fun moveTemplate(id: String, delta: Int) = settings { s ->
+        val list = s.shiftTemplates.toMutableList()
+        val i = list.indexOfFirst { it.id == id }
+        val j = i + delta
+        if (i < 0 || j !in list.indices) return@settings s
+        list.add(j, list.removeAt(i))
+        s.copy(shiftTemplates = list)
+    }
+
+    fun resetTemplates() = settings { it.copy(shiftTemplates = ShiftType.DEFAULTS) }
 
     fun endShift(rating: Int? = null, note: String = "") = update { d ->
         val active = d.activeShift ?: return@update d

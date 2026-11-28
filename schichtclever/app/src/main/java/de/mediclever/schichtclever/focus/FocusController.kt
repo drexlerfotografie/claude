@@ -1,11 +1,13 @@
 package de.mediclever.schichtclever.focus
 
+import android.app.AppOpsManager
 import android.app.NotificationManager
+import android.os.Build
+import android.os.Process
 import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
 import android.service.quicksettings.TileService
-import android.text.TextUtils
 import de.mediclever.schichtclever.data.AppData
 import de.mediclever.schichtclever.data.FilterSchedule
 import de.mediclever.schichtclever.data.Repository
@@ -19,12 +21,19 @@ object FocusController {
     fun hasDndAccess(context: Context): Boolean =
         context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
 
-    fun isGuardEnabled(context: Context): Boolean {
-        val expected = ComponentName(context, GuardService::class.java).flattenToString()
-        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
-        val splitter = TextUtils.SimpleStringSplitter(':').apply { setString(enabled) }
-        return splitter.any { it.equals(expected, ignoreCase = true) }
+    fun hasUsageAccess(context: Context): Boolean {
+        val ops = context.getSystemService(AppOpsManager::class.java)
+        val mode = if (Build.VERSION.SDK_INT >= 29) ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+        else @Suppress("DEPRECATION") ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+        return mode == AppOpsManager.MODE_ALLOWED
     }
+
+    fun canOverlay(context: Context): Boolean = Settings.canDrawOverlays(context)
+
+    /** Der Dienst läuft, solange gesperrt oder gefiltert werden muss – oder der Filter-Zeitplan wartet. */
+    fun serviceNeeded(data: AppData): Boolean =
+        (data.focusActive && data.settings.blockedApps.isNotEmpty()) ||
+            filterActive(data) || data.settings.filterSchedule == FilterSchedule.ZEITRAUM
 
     fun filterActive(data: AppData, now: Long = System.currentTimeMillis()): Boolean {
         val s = data.settings
@@ -39,6 +48,7 @@ object FocusController {
     /** Gleicht "Bitte nicht stören" und die Kacheln mit dem aktuellen Zustand ab. */
     fun sync(context: Context, data: AppData) {
         syncDnd(context, data)
+        if (serviceNeeded(data)) FocusService.start(context)
         listOf(ShiftTileService::class.java, EinsatzTileService::class.java, FocusTileService::class.java).forEach {
             runCatching { TileService.requestListeningState(context, ComponentName(context, it)) }
         }

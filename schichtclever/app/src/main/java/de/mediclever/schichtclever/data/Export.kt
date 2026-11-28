@@ -22,14 +22,14 @@ object Export {
             fun names(inv: Involvement) = e.measures.filter { it.involvement == inv }
                 .joinToString(", ") { Catalog.byId(it.skillId, custom)?.name ?: it.skillId }
             sb.append(listOf(
-                ts(e.alarmAt), shift?.type?.label ?: "", e.category.label, e.urgency.label, e.outcome?.label ?: "",
+                ts(e.alarmAt), shift?.type?.let { "${it.code} ${it.label}" } ?: "", e.category.label, e.urgency.label, e.outcome?.label ?: "",
                 esc(names(Involvement.SELBST)), esc(names(Involvement.ASSISTIERT)), esc(e.note),
             ).joinToString(";")).append('\n')
         }
         sb.append("\nSchichtbeginn;Schichtende;Typ;Fahrzeug/Station;Einsätze;Bewertung;Notiz\n")
         data.shifts.sortedBy { it.startAt }.forEach { s ->
             sb.append(listOf(
-                ts(s.startAt), ts(s.endAt), s.type.label, esc(s.unit),
+                ts(s.startAt), ts(s.endAt), "${s.type.code} ${s.type.label}", esc(s.unit),
                 data.einsaetze.count { it.shiftId == s.id }.toString(), s.rating?.toString() ?: "", esc(s.note),
             ).joinToString(";")).append('\n')
         }

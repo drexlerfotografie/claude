@@ -103,7 +103,7 @@ fun StatsScreen(data: AppData) {
             McCard(Modifier.fillMaxWidth()) {
                 BarChart(
                     values = s.avgPerShiftType.map { (it.second * 10).toInt() },
-                    labels = s.avgPerShiftType.map { it.first.label },
+                    labels = s.avgPerShiftType.map { it.first },
                     height = 90.dp,
                 )
                 Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {

@@ -10,7 +10,6 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import de.mediclever.schichtclever.data.AppData
 import de.mediclever.schichtclever.data.Role
-import de.mediclever.schichtclever.data.ShiftType
 import de.mediclever.schichtclever.ui.screens.EinsatzEditorScreen
 import de.mediclever.schichtclever.ui.screens.FilterScreen
 import de.mediclever.schichtclever.ui.screens.MoreScreen
@@ -19,6 +18,7 @@ import de.mediclever.schichtclever.ui.screens.ShiftScreen
 import de.mediclever.schichtclever.ui.screens.SkillDetailScreen
 import de.mediclever.schichtclever.ui.screens.SkillsScreen
 import de.mediclever.schichtclever.ui.screens.StatsScreen
+import de.mediclever.schichtclever.ui.screens.TemplatesScreen
 import de.mediclever.schichtclever.ui.theme.SchichtCleverTheme
 import org.junit.Rule
 import org.junit.Test
@@ -40,7 +40,7 @@ class ScreenshotTest {
     @Test fun schichtStart() = shot { ShiftScreen(SampleData.build(active = false), {}, {}, {}, {}) }
     @Test fun schichtAktivNacht() = shot { ShiftScreen(data, {}, {}, {}, {}) }
     @Test fun schichtAktivTagHell() = shot(dark = false) {
-        val d = SampleData.build(activeType = ShiftType.FRUEH)
+        val d = SampleData.build(activeType = SampleData.FRUEH)
         ShiftScreen(d.copy(settings = d.settings.copy(role = Role.PFLEGE)), {}, {}, {}, {})
     }
     @Test fun einsatzErfassen() = shot { EinsatzEditorScreen(data, data.einsaetze.first { it.note == "ACS-Verdacht" }.id) {} }
@@ -48,5 +48,10 @@ class ScreenshotTest {
     @Test fun skills() = shot { SkillsScreen(data, true) {} }
     @Test fun skillDetail() = shot { SkillDetailScreen(data, "io") {} }
     @Test fun blaufilter() = shot { FilterScreen(data) {} }
+    @Test fun schichtStartEigene() = shot {
+        val d = SampleData.build(active = false)
+        ShiftScreen(d.copy(settings = d.settings.copy(shiftTemplates = SampleData.CUSTOM)), {}, {}, {}, {})
+    }
+    @Test fun meineSchichten() = shot { TemplatesScreen(data.copy(settings = data.settings.copy(shiftTemplates = SampleData.CUSTOM))) {} }
     @Test fun mehr() = shot { MoreScreen(data, true, {}, {}) }
 }

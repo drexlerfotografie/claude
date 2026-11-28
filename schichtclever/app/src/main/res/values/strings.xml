@@ -4,6 +4,4 @@
     <string name="tile_shift">Schicht</string>
     <string name="tile_einsatz">+ Einsatz</string>
     <string name="tile_focus">Fokus</string>
-    <string name="guard_label">SchichtClever Fokus &amp; Blaufilter</string>
-    <string name="guard_description">Sperrt während deiner Schicht die Apps, die du in SchichtClever ausgewählt hast, und legt den Blaufilter über den Bildschirm. SchichtClever liest dafür nur, welche App gerade geöffnet ist, keine Inhalte. Es werden keine Daten gesendet.</string>
 </resources>

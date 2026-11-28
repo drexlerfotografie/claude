@@ -3,6 +3,14 @@
 
     <!-- Bewusst KEINE Internet-Berechtigung: alle Daten bleiben auf dem Gerät. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Erkennen, welche App im Vordergrund ist (wird vom Nutzer in den Einstellungen erlaubt). -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        xmlns:tools="http://schemas.android.com/tools" tools:ignore="ProtectedPermissions" />
+    <!-- Blaufilter-Overlay und Sperrseite. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Für die App-Liste im Fokus-Modus (nur Apps mit Startsymbol). -->
     <queries>
@@ -42,14 +50,12 @@
             android:taskAffinity="de.mediclever.schichtclever.block" />
 
         <service
-            android:name=".focus.GuardService"
-            android:exported="true"
-            android:label="@string/guard_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data android:name="android.accessibilityservice" android:resource="@xml/guard_service" />
+            android:name=".focus.FocusService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Fokus-Modus während einer Arbeitsschicht: pausiert vom Nutzer gewählte Apps und zeigt einen Blaufilter." />
         </service>
 
         <service
